@@ -35,7 +35,8 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ✅ Filtres : recherche, verticale, commercial, inactivité ; étapes fermées masquables
 - ✅ Prospects sans activité récente (seuil réglable)
 - ✅ Vue priorisée (règles provisoires, raisons affichées)
-- ⬜ Plus tard : filtre par score (phase 5), glisser-déposer (composant tiers, à valider)
+- ✅ Tableau façon HubSpot : glisser-déposer, cartes détaillées, filtres rapides, tri, vue table (v0.10.0)
+- ⬜ Plus tard : « Mes prospects » (après la gestion des utilisateurs, phase 11)
 
 ## Phase 5 — Scoring ✅
 - ✅ Fit Score (profil cible configurable)

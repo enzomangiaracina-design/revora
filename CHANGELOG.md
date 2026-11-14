@@ -1,5 +1,46 @@
 # CHANGELOG — REVORA
 
+## [0.10.0] — 2026-11-14 — Pipeline façon HubSpot (glisser-déposer)
+
+Mise en page inspirée du pipeline HubSpot, aux couleurs de la charte REVORA.
+La capture HubSpot fournie n'a servi que de modèle visuel : aucune de ses données n'a été reprise.
+
+### Ajouté
+- `ui/kanban.py` : tableau Kanban en **composant personnalisé Streamlit** (API components v2,
+  incluse dans Streamlit 1.67, aucune dépendance ajoutée) :
+  - colonnes de largeur fixe avec défilement horizontal, « nom de l'étape + compteur » ;
+  - **glisser-déposer** d'une carte vers une autre colonne → étape enregistrée en base, compteurs
+    mis à jour, message de confirmation ;
+  - cartes : entreprise en titre (lien), Created / Last activity / Next follow-up / Owner / Score,
+    séparateur, contact avec avatar à initiales, icônes « ouvrir la fiche » et « relances » ;
+  - relance en retard en rouge, inactivité en orange, colonne vide « No prospect » ;
+  - toutes les données insérées avec `textContent` (aucune exécution de contenu).
+- En-tête du pipeline : vues **Board / Table / Priorities / Stages**, recherche, bouton **Filter**
+  (verticale, température, score minimum, seuil d'inactivité, étapes fermées), **Sort by**.
+- Filtres rapides sous la barre, comme HubSpot : **Sales owner**, **Create date**, **Last activity**,
+  **Next follow-up** (le libellé affiche le filtre actif).
+- Clic sur une carte → ouverture directe de la fiche du prospect.
+- `core/pipeline_service.py` : `build_card`, `sort_prospects` (5 tris), `filter_quick`,
+  `format_date`, `initials`. `get_all_prospects` renvoie aussi `created_at_local`.
+- 18 nouveaux tests (158 au total).
+
+### Modifié
+- Les anciennes cartes Streamlit (menu déroulant pour changer d'étape) sont remplacées par le composant.
+- Onglets du pipeline remplacés par un sélecteur de vue (comme la bascule tableau / kanban de HubSpot).
+
+### Tests effectués
+- `python3 -m pytest` : 158 tests réussis ; `revora.db` inchangée.
+- Les 9 pages s'affichent sans erreur (sur une copie).
+- Navigateur (1440 px) sur une copie avec 8 prospects fictifs : tableau, glisser-déposer (étape
+  enregistrée en base, compteurs, message), clic → fiche prospect, filtre rapide, vue Table.
+  Le glisser-déposer a été déclenché par des événements HTML5 natifs : l'automatisation à la souris
+  du navigateur de test ne les produit pas. **À confirmer à la main** sur votre Mac.
+- Sauvegarde préalable : `backups/20261114-234921/`. Aucune migration de base.
+
+### Différences avec HubSpot
+- Pas d'onglet « Mes transactions » : REVORA n'a pas encore d'utilisateurs (phase 11).
+- Pas de montant ni de date de fermeture : REVORA suit des prospects, pas des transactions.
+
 ## [0.9.0] — 2026-11-14 — Branding (avant la phase 8)
 
 Application de l'identité visuelle du brand kit (`REVORA_Brand_Kit/REVORA_Direction_Artistique.pdf`).

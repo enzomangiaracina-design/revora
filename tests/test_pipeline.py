@@ -218,3 +218,84 @@ def test_prioritize_ties_broken_by_score():
     ranked = pipeline.prioritize(prospects, STAGES, {}, today=TODAY, scores={1: 20, 2: 65})
 
     assert [r["prospect"]["id"] for r in ranked] == [2, 1]
+
+
+# ---------- Tableau façon HubSpot : cartes, tris, filtres rapides ----------
+
+SUMMARIES = {
+    1: {"last_interaction_at": "2026-11-13 10:00:00", "next_task_due": "2026-11-10", "next_task_title": "Relancer"},
+    2: {"last_interaction_at": "2026-10-01 09:00:00", "next_task_due": "2026-11-14", "next_task_title": "Démo"},
+    3: {},
+}
+
+PROSPECTS_HS = [
+    {"id": 1, "first_name": "Ana", "last_name": "Lopez", "company_name": "Zeta", "owner": "Léa",
+     "created_at": "2026-11-14 08:00:00", "created_at_local": "2026-11-14 09:00:00", "status": "A prospecter"},
+    {"id": 2, "first_name": "bob", "last_name": "ray", "company_name": "alpha", "owner": None,
+     "created_at": "2026-10-20 08:00:00", "created_at_local": "2026-10-20 10:00:00", "status": "En contact"},
+    {"id": 3, "first_name": "Chloé", "last_name": "", "company_name": None, "owner": "Léa",
+     "created_at": "2026-11-10 08:00:00", "created_at_local": "2026-11-10 09:00:00", "status": "A prospecter"},
+]
+
+SCORES = {1: {"global": 30, "temperature": "Cold"}, 2: {"global": 75, "temperature": "Hot"},
+          3: {"global": 50, "temperature": "Warm"}}
+
+
+def ids(items):
+    return [p["id"] for p in items]
+
+
+def test_format_date_and_initials():
+    assert pipeline.format_date("2026-11-04 10:05:00") == "04/11/2026"
+    assert pipeline.format_date(None) is None
+    assert pipeline.initials("bob", "ray") == "BR"
+    assert pipeline.initials("Chloé", "") == "C"
+    assert pipeline.initials(None, None) == "?"
+
+
+def test_build_card():
+    card = pipeline.build_card(PROSPECTS_HS[0], SUMMARIES[1], SCORES[1], stale_days=14, today=TODAY)
+
+    assert card == {
+        "id": 1, "title": "Zeta", "contact": "Ana Lopez", "initials": "AL",
+        "created": "14/11/2026", "last_activity": "13/11/2026 (1 d ago)", "stale": False,
+        "next_follow_up": "10/11/2026 · Relancer", "overdue": True,
+        "owner": "Léa", "score": 30, "temperature": "Cold",
+    }
+
+    empty = pipeline.build_card(PROSPECTS_HS[2], {}, None, today=TODAY)
+    assert (empty["title"], empty["last_activity"], empty["stale"]) == ("No company", "Never contacted", True)
+    assert (empty["next_follow_up"], empty["overdue"], empty["owner"]) == ("None scheduled", False, "Léa")
+    assert (empty["score"], empty["temperature"]) == (0, "Cold")
+
+
+@pytest.mark.parametrize("sort_by, expected", [
+    ("Last activity (most recent)", [1, 2, 3]),
+    ("Create date (newest)", [1, 3, 2]),
+    ("Score (highest)", [2, 3, 1]),
+    ("Next follow-up (soonest)", [1, 2, 3]),
+    ("Company (A–Z)", [3, 2, 1]),  # sans entreprise d'abord, puis alpha, Zeta (sans tenir compte de la casse)
+])
+def test_sort_prospects(sort_by, expected):
+    assert ids(pipeline.sort_prospects(PROSPECTS_HS, sort_by, SUMMARIES, SCORES)) == expected
+
+
+@pytest.mark.parametrize("kwargs, expected", [
+    ({}, [1, 2, 3]),
+    ({"created": "Today"}, [1]),
+    ({"created": "Last 7 days"}, [1, 3]),
+    ({"activity": "Last 7 days"}, [1]),
+    ({"activity": "Inactive"}, [2, 3]),
+    ({"activity": "Never contacted"}, [3]),
+    ({"follow_up": "Overdue"}, [1]),
+    ({"follow_up": "Due today"}, [2]),
+    ({"follow_up": "None scheduled"}, [3]),
+    ({"created": "Last 30 days", "follow_up": "Due today"}, [2]),
+])
+def test_filter_quick(kwargs, expected):
+    assert ids(pipeline.filter_quick(PROSPECTS_HS, SUMMARIES, stale_days=14, today=TODAY, **kwargs)) == expected
+
+
+def test_created_at_local_is_returned(thomas):
+    prospect = database.get_all_prospects()[0]
+    assert prospect["created_at_local"]  # heure locale pour l'affichage et les filtres

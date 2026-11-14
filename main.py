@@ -49,10 +49,17 @@ from database import (
 from core.pipeline_service import (
     DEFAULT_STALE_DAYS,
     build_board,
-    days_since,
-    is_stale,
-    prioritize
+    prioritize,
+    SORT_OPTIONS,
+    CREATED_FILTERS,
+    ACTIVITY_FILTERS,
+    FOLLOW_UP_FILTERS,
+    filter_quick,
+    sort_prospects,
+    build_card
 )
+
+from ui.kanban import pipeline_board, event_value
 
 from core.prospect_service import (
     CSV_TEMPLATE,
@@ -131,11 +138,12 @@ page = st.sidebar.radio(
         "Settings"
     ],
     format_func=theme.nav_label,
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="nav_page"
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.9.0")
+st.sidebar.caption("VERSION 0.10.0")
 
 
 # ==========================================
@@ -294,16 +302,47 @@ def interaction_form(form_key, prospect_options=None):
     return submitted, contact_id, data
 
 
-def _move_prospect(contact_id, widget_key):
-    """Appele quand l'etape d'une carte change (callback du selectbox).
+BOARD_KEY = "pipeline_board"
 
-    Concept : un "callback" est une fonction que Streamlit execute juste
-    apres le changement d'un widget, avant de relancer la page. La page
-    affiche donc directement le prospect dans sa nouvelle colonne.
+
+def prospect_label(prospect):
+    """Libelle d'un prospect dans les listes de choix (doit rester identique partout)."""
+
+    return f"{prospect['first_name']} {prospect['last_name']} — {prospect['company_name']}"
+
+
+def open_prospect(contact_id):
+    """Ouvre la fiche d'un prospect (a appeler depuis un callback).
+
+    Concept : un "callback" s'execute AVANT que la page soit redessinee.
+    C'est le seul moment ou l'on peut changer la valeur d'un widget deja
+    affiche (ici la navigation et le choix du prospect).
     """
 
-    ok, message = set_prospect_stage(contact_id, st.session_state[widget_key])
-    st.session_state["flash"] = message if ok else f"Error: {message}"
+    prospect = get_prospect_by_id(contact_id)
+
+    if prospect:
+        st.session_state["nav_page"] = "Prospect Details"
+        st.session_state["details_prospect"] = prospect_label(prospect)
+
+
+def _on_board_move():
+    """Glisser-deposer d'une carte : enregistre la nouvelle etape."""
+
+    move = event_value(BOARD_KEY, "move")
+
+    if move:
+        ok, message = set_prospect_stage(int(move["id"]), move["stage"])
+        st.session_state["flash"] = message if ok else f"Error: {message}"
+
+
+def _on_board_open():
+    """Clic sur une carte : ouvre la fiche du prospect."""
+
+    target = event_value(BOARD_KEY, "open")
+
+    if target:
+        open_prospect(int(target["id"]))
 
 
 TEMPERATURE_COLORS = {"Hot": "red", "Warm": "orange", "Cold": "blue"}
@@ -318,46 +357,6 @@ def score_label(result):
     color = TEMPERATURE_COLORS[result["temperature"]]
 
     return f":{color}[{result['global']} · {result['temperature']}]"
-
-
-def pipeline_card(prospect, summary, stale_days):
-    """Carte d'un prospect dans le tableau Kanban."""
-
-    with st.container(border=True):
-
-        st.markdown(f"**{prospect['first_name']} {prospect['last_name']}**")
-        st.caption(f"{prospect['company_name']} · {prospect['vertical'] or '—'}")
-        st.caption(score_label(scores.get(prospect["id"])))
-
-        if summary.get("next_task_title"):
-            due = summary["next_task_due"] or ""
-            text = f"→ {due or 'no date'} · {summary['next_task_title']}"
-
-            if due and due[:10] < date.today().isoformat():
-                st.caption(f":red[Overdue {text}]")
-            else:
-                st.caption(text)
-
-        days = days_since(summary.get("last_interaction_at"))
-
-        if days is None:
-            st.caption(":orange[Never contacted]")
-        elif days >= stale_days:
-            st.caption(f":orange[No activity for {days} days]")
-        else:
-            st.caption(f"Last activity: {days} day(s) ago")
-
-        key = f"stage_of_{prospect['id']}"
-
-        st.selectbox(
-            "Stage",
-            stage_names,
-            index=stage_names.index(prospect["status"]) if prospect["status"] in stage_names else 0,
-            key=key,
-            label_visibility="collapsed",
-            on_change=_move_prospect,
-            args=(prospect["id"], key)
-        )
 
 
 def follow_up_card(task, show_prospect=True):
@@ -690,14 +689,16 @@ elif page == "Prospect Details":
 
     else:
 
-        prospect_options = {
-            f"{p['first_name']} {p['last_name']} — {p['company_name']}": p["id"]
-            for p in prospects
-        }
+        prospect_options = {prospect_label(p): p["id"] for p in prospects}
+
+        # Prospect choisi depuis le pipeline mais supprime entre-temps : on l'oublie
+        if st.session_state.get("details_prospect") not in prospect_options:
+            st.session_state.pop("details_prospect", None)
 
         selected_name = st.selectbox(
             "Select a prospect",
-            list(prospect_options.keys())
+            list(prospect_options.keys()),
+            key="details_prospect"
         )
 
         contact_id = prospect_options[selected_name]
@@ -984,94 +985,148 @@ elif page == "Prospect Details":
 
 elif page == "Prospecting Pipeline":
 
-    st.title("Prospecting Pipeline")
-    st.caption("Where every prospect stands — and who needs your attention.")
+    # ---------- EN-TETE : titre et choix de la vue (comme HubSpot) ----------
+
+    col_title, col_view = st.columns([3, 2], vertical_alignment="bottom")
+
+    col_title.title("Prospecting Pipeline")
+    view = col_view.segmented_control(
+        "View",
+        ["Board", "Table", "Priorities", "Stages"],
+        default="Board",
+        key="pipeline_view",
+        label_visibility="collapsed",
+    ) or "Board"
 
     show_flash_message()
 
     stages = get_stages()
     summaries = get_activity_summary()
 
-    # ---------- FILTRES (communs au tableau et aux priorites) ----------
+    if view != "Stages":
 
-    col_search, col_vertical, col_owner, col_days, col_toggles = st.columns([2, 1, 1, 1, 1])
+        # ---------- BARRE D'OUTILS : recherche, filtres, tri ----------
 
-    query = col_search.text_input(
-        "Search", placeholder="Name, company, email or phone", key="pipeline_search"
-    )
-    selected_verticals = col_vertical.multiselect(
-        "Vertical", get_verticals(), key="pipeline_verticals"
-    )
-    selected_owners = col_owner.multiselect(
-        "Sales owner",
-        sorted({p["owner"] for p in prospects if p["owner"]}),
-        key="pipeline_owners"
-    )
-    stale_days = col_days.number_input(
-        "Inactive after (days)", min_value=1, value=DEFAULT_STALE_DAYS, key="stale_days"
-    )
-    only_stale = col_toggles.toggle("Only inactive", key="pipeline_only_stale")
-    show_closed = col_toggles.toggle("Show closed stages", key="pipeline_show_closed")
+        col_search, col_filter, col_sort = st.columns([3, 1, 2], vertical_alignment="bottom")
 
-    col_score, col_temperature, _ = st.columns([2, 2, 2])
+        query = col_search.text_input(
+            "Search", placeholder="Search name, company, email or phone",
+            key="pipeline_search", label_visibility="collapsed"
+        )
 
-    min_score = col_score.slider("Minimum score", 0, 100, 0, key="pipeline_min_score")
-    selected_temperatures = col_temperature.multiselect(
-        "Temperature", ["Hot", "Warm", "Cold"], key="pipeline_temperatures"
-    )
+        with col_filter.popover("Filter", icon=":material/filter_list:", width="stretch"):
+            selected_verticals = st.multiselect("Vertical", get_verticals(), key="pipeline_verticals")
+            selected_temperatures = st.multiselect(
+                "Temperature", ["Hot", "Warm", "Cold"], key="pipeline_temperatures"
+            )
+            min_score = st.slider("Minimum score", 0, 100, 0, key="pipeline_min_score")
+            stale_days = st.number_input(
+                "Inactive after (days)", min_value=1, value=DEFAULT_STALE_DAYS, key="stale_days"
+            )
+            show_closed = st.toggle("Show closed stages", key="pipeline_show_closed")
 
-    filtered = filter_prospects(
-        prospects, query, selected_verticals, None, None, selected_owners
-    )
+        sort_by = col_sort.selectbox(
+            "Sort by", SORT_OPTIONS, key="pipeline_sort", label_visibility="collapsed"
+        )
 
-    if only_stale:
+        # ---------- FILTRES RAPIDES (ligne sous la barre, comme HubSpot) ----------
+
+        owners = sorted({p["owner"] for p in prospects if p["owner"]})
+
+        def quick_label(name, key, default):
+            value = st.session_state.get(key)
+            if isinstance(value, list):
+                value = ", ".join(value) if value else None
+            return f"{name}: {value}" if value and value != default else name
+
+        col_owner, col_created, col_activity, col_follow, _ = st.columns([1, 1, 1, 1, 1])
+
+        with col_owner.popover(quick_label("Sales owner", "pipeline_owners", None), width="stretch"):
+            selected_owners = st.multiselect("Sales owner", owners, key="pipeline_owners")
+
+        with col_created.popover(quick_label("Create date", "qf_created", "Any time"), width="stretch"):
+            created_filter = st.radio("Create date", CREATED_FILTERS, key="qf_created")
+
+        with col_activity.popover(quick_label("Last activity", "qf_activity", "Any time"), width="stretch"):
+            activity_filter = st.radio("Last activity", ACTIVITY_FILTERS, key="qf_activity")
+
+        with col_follow.popover(quick_label("Next follow-up", "qf_follow_up", "Any"), width="stretch"):
+            follow_up_filter = st.radio("Next follow-up", FOLLOW_UP_FILTERS, key="qf_follow_up")
+
+        # ---------- APPLICATION DES FILTRES ET DU TRI ----------
+
+        filtered = filter_prospects(prospects, query, selected_verticals, None, None, selected_owners)
+        filtered = filter_quick(
+            filtered, summaries, created_filter, activity_filter, follow_up_filter, stale_days
+        )
         filtered = [
-            p for p in filtered if is_stale(summaries.get(p["id"]), stale_days)
+            p for p in filtered
+            if scores[p["id"]]["global"] >= min_score
+            and (not selected_temperatures or scores[p["id"]]["temperature"] in selected_temperatures)
         ]
-
-    filtered = [
-        p for p in filtered
-        if scores[p["id"]]["global"] >= min_score
-        and (not selected_temperatures or scores[p["id"]]["temperature"] in selected_temperatures)
-    ]
-
-    tab_board, tab_priorities, tab_stages = st.tabs(
-        ["Board", "Priorities", "Stages"], key="pipeline_tabs"
-    )
-
-    # ---------- TABLEAU KANBAN ----------
-
-    with tab_board:
+        filtered = sort_prospects(filtered, sort_by, summaries, scores)
 
         visible_stages = [s for s in stages if show_closed or not s["is_closed"]]
         board = build_board(filtered, stages)
-
         hidden = sum(len(board[s["name"]]) for s in stages if s not in visible_stages)
 
         st.caption(
-            f"{len(filtered)} prospect(s)"
-            + (f" · {hidden} in closed stages (hidden)" if hidden else "")
+            f"{len(filtered)} of {len(prospects)} prospect(s)"
+            + (f" · {hidden} in closed stages (hidden)" if hidden and view != "Priorities" else "")
         )
 
-        MAX_CARDS = 50
+    # ---------- VUE KANBAN (glisser-deposer) ----------
 
-        for column, stage in zip(st.columns(len(visible_stages)), visible_stages):
+    if view == "Board":
 
-            cards = board[stage["name"]]
+        pipeline_board(
+            [
+                {
+                    "name": stage["name"],
+                    "closed": stage["is_closed"],
+                    "cards": [
+                        build_card(p, summaries.get(p["id"]), scores.get(p["id"]), stale_days)
+                        for p in board[stage["name"]]
+                    ],
+                }
+                for stage in visible_stages
+            ],
+            key=BOARD_KEY,
+            on_move=_on_board_move,
+            on_open=_on_board_open,
+        )
 
-            with column:
-                st.markdown(f"**{stage['name']}**")
-                st.caption(f"{len(cards)} prospect(s)" + (" · closed" if stage["is_closed"] else ""))
+        st.caption("Drag a card to another column to change its stage. Click a company to open the prospect file.")
 
-                for prospect in cards[:MAX_CARDS]:
-                    pipeline_card(prospect, summaries.get(prospect["id"], {}), stale_days)
+    # ---------- VUE TABLE ----------
 
-                if len(cards) > MAX_CARDS:
-                    st.caption(f"+ {len(cards) - MAX_CARDS} more — narrow the filters.")
+    if view == "Table":
+
+        rows = [
+            {
+                "Company": card["title"],
+                "Contact": card["contact"],
+                "Stage": p["status"],
+                "Score": card["score"],
+                "Temperature": card["temperature"],
+                "Created": card["created"],
+                "Last activity": card["last_activity"],
+                "Next follow-up": card["next_follow_up"],
+                "Owner": card["owner"],
+            }
+            for p in filtered
+            if p["status"] in {s["name"] for s in visible_stages}
+            for card in [build_card(p, summaries.get(p["id"]), scores.get(p["id"]), stale_days)]
+        ]
+
+        if rows:
+            st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+        else:
+            st.info("No prospect matches these filters.")
 
     # ---------- VUE PRIORISEE ----------
 
-    with tab_priorities:
+    if view == "Priorities":
 
         st.caption(
             "Urgency rules: overdue follow-up +3, follow-up due today +2, "
@@ -1108,7 +1163,7 @@ elif page == "Prospecting Pipeline":
 
     # ---------- GESTION DES ETAPES ----------
 
-    with tab_stages:
+    if view == "Stages":
 
         st.caption(
             "Renaming a stage also updates every prospect in it. "

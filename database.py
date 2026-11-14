@@ -415,6 +415,7 @@ def get_all_prospects():
             contacts.owner,
             contacts.hubspot_id,
             contacts.created_at,
+            datetime(contacts.created_at, 'localtime') AS created_at_local,
             contacts.need_identified,
             contacts.is_decision_maker,
             contacts.budget_confirmed,
