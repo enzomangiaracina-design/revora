@@ -1,0 +1,20 @@
+# Secrets (clés API, identifiants OAuth) — ne jamais versionner
+.env
+
+# Base de données locale : contient des données de prospects (RGPD)
+*.db
+*.db-journal
+*.sqlite3
+
+# Sauvegardes locales
+backups/
+
+# Fichiers générés par Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Fichiers système / éditeur
+.DS_Store
+.vscode/
