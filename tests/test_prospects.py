@@ -186,3 +186,15 @@ def test_import_report(thomas):
     marie = [p for p in database.get_all_prospects() if p["first_name"] == "Marie"][0]
     assert marie["source"] == "Test"
     assert marie["status"] == "A prospecter"
+
+
+def test_company_match_ignores_accented_case(temp_db):
+    """« SOCIÉTÉ GÉNÉRALE » et « Société Générale » sont la même entreprise."""
+
+    database.create_prospect("A", "One", "Société Générale", "Finance", None, None, None)
+    database.create_prospect("B", "Two", "SOCIÉTÉ GÉNÉRALE", "Finance", None, None, None)
+
+    import sqlite3
+    connection = sqlite3.connect(temp_db)
+    assert connection.execute("SELECT count(*) FROM companies").fetchone()[0] == 1
+    connection.close()

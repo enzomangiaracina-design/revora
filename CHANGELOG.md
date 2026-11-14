@@ -1,5 +1,42 @@
 # CHANGELOG — REVORA
 
+## [0.6.0] — 2026-11-14 — Phase 4 : Pipeline
+
+### Ajouté
+- Page **Prospecting Pipeline** (onglets mémorisés), avec des filtres communs : recherche, verticale,
+  commercial, seuil d'inactivité (14 jours par défaut), « seulement inactifs », « afficher les étapes fermées ».
+  - **Board** (Kanban) : une colonne par étape. Chaque carte affiche l'entreprise, la verticale et la prochaine
+    relance (en rouge si elle est en retard), signale les prospects inactifs ou jamais contactés, et propose
+    un menu pour changer d'étape (déplacement immédiat).
+  - **Priorities** : vue priorisée par règles simples et explicables (relance en retard +3, relance du jour +2,
+    jamais contacté +1, inactif +1 ; étapes fermées exclues), avec la raison affichée pour chaque prospect.
+    Règles provisoires en attendant le scoring (phase 5).
+  - **Stages** : renommer (les prospects suivent), réordonner, marquer une étape comme fermée, ajouter,
+    supprimer (avec choix de l'étape où déplacer ses prospects ; au moins une étape conservée).
+- Table `pipeline_stages` (nom, position, fermée) : créée automatiquement avec les 8 étapes par défaut ;
+  tout statut déjà utilisé par un prospect est ajouté pour qu'aucun prospect ne soit perdu.
+- Les statuts du formulaire prospect et des filtres viennent désormais des étapes du pipeline ;
+  sans statut, un nouveau prospect entre dans la première étape.
+- Filtre **Sales owner** (commercial) dans la page Prospects.
+- `core/pipeline_service.py` : tableau, calcul d'inactivité, priorités.
+- 21 nouveaux tests (94 au total).
+
+### Corrigé
+- Les comparaisons de noms ignorant la casse ne géraient pas les lettres accentuées (`lower()` de SQLite) :
+  « SOCIÉTÉ GÉNÉRALE » et « Société Générale » créaient deux entreprises. Comparaison faite en Python (`casefold`).
+
+### Tests effectués
+- `python3 -m pytest` : 94 tests réussis ; `revora.db` inchangée.
+- Interface sur une copie : toutes les pages, déplacement d'une carte, priorités, renommage / ajout /
+  réordonnancement / suppression d'étapes, statuts dynamiques dans les filtres.
+- Navigateur (1440 px) sur une copie : tableau, relance en retard en rouge, inactivité, priorités,
+  déplacement d'une carte vers « Rendez-vous obtenu ».
+- Sauvegarde préalable : `backups/20261114-231303/`. Migration : création de la table `pipeline_stages`.
+
+### Limites connues
+- Pas de glisser-déposer : Streamlit ne le propose pas nativement (il faudrait un composant tiers).
+- Le filtre par score attendra le moteur de scoring (phase 5).
+
 ## [0.5.0] — 2026-11-14 — Phase 3 : Activity Manager
 
 ### Ajouté

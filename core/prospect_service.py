@@ -19,18 +19,10 @@ import pandas as pd
 import database
 from core.deduplication import normalize_email, normalize_phone
 
-# Étapes de prospection (cahier des charges). "A prospecter" est la valeur
-# par défaut déjà utilisée dans la base : elle est conservée telle quelle.
-STATUSES = [
-    "A prospecter",
-    "Première tentative",
-    "En contact",
-    "Intéressé",
-    "Rendez-vous obtenu",
-    "A relancer",
-    "Non intéressé",
-    "Disqualifié",
-]
+# Les statuts sont les étapes du pipeline, personnalisables et stockées en base
+# (table pipeline_stages). DEFAULT_STAGES ne sert que de valeur de repli pour
+# valider des données sans accès à la base.
+DEFAULT_STAGES = database.DEFAULT_STAGES
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -61,12 +53,15 @@ CSV_TEMPLATE = (
 # VALIDATION ET DOUBLONS
 # ==========================================
 
-def validate_prospect(data):
+def validate_prospect(data, statuses=None):
     """Retourne la liste des erreurs (vide si les données sont valides).
 
     `data` est un dictionnaire avec les clés first_name, last_name,
     company_name, email, phone, status (les autres sont libres).
+    `statuses` : étapes autorisées (par défaut DEFAULT_STAGES).
     """
+
+    statuses = statuses or DEFAULT_STAGES
 
     errors = []
 
@@ -87,7 +82,7 @@ def validate_prospect(data):
         errors.append(f"Téléphone invalide : {phone}")
 
     status = (data.get("status") or "").strip()
-    if status and status not in STATUSES:
+    if status and status not in statuses:
         errors.append(f"Statut inconnu : {status}")
 
     return errors
@@ -127,10 +122,22 @@ def _identity(first_name, last_name, company_name):
 # CREATION ET MODIFICATION
 # ==========================================
 
+def _apply_default_stage(data, stages):
+    """Sans statut, le prospect entre dans la première étape du pipeline."""
+
+    if not (data.get("status") or "").strip() and stages:
+        data = {**data, "status": stages[0]}
+
+    return data
+
+
 def create_prospect(data):
     """Valide puis crée un prospect. Retourne (succès, message)."""
 
-    errors = validate_prospect(data)
+    stages = database.get_stage_names()
+    data = _apply_default_stage(data, stages)
+
+    errors = validate_prospect(data, stages)
     if errors:
         return False, " ".join(errors)
 
@@ -158,7 +165,10 @@ def create_prospect(data):
 def update_prospect(contact_id, data):
     """Valide puis met à jour un prospect. Retourne (succès, message)."""
 
-    errors = validate_prospect(data)
+    stages = database.get_stage_names()
+    data = _apply_default_stage(data, stages)
+
+    errors = validate_prospect(data, stages)
     if errors:
         return False, " ".join(errors)
 
@@ -188,12 +198,14 @@ def update_prospect(contact_id, data):
 # RECHERCHE ET FILTRES
 # ==========================================
 
-def filter_prospects(prospects, query="", verticals=None, statuses=None, sources=None):
+def filter_prospects(
+    prospects, query="", verticals=None, statuses=None, sources=None, owners=None
+):
     """Filtre une liste de prospects.
 
     query : texte cherché dans le nom, l'entreprise, l'email, le poste et le
             téléphone (le téléphone est comparé chiffres uniquement).
-    verticals, statuses, sources : listes de valeurs acceptées (vide = tout).
+    verticals, statuses, sources, owners : listes de valeurs acceptées (vide = tout).
     """
 
     query = (query or "").strip().lower()
@@ -207,6 +219,8 @@ def filter_prospects(prospects, query="", verticals=None, statuses=None, sources
         if statuses and prospect.get("status") not in statuses:
             continue
         if sources and prospect.get("source") not in sources:
+            continue
+        if owners and prospect.get("owner") not in owners:
             continue
 
         if query:
@@ -303,13 +317,14 @@ def import_prospects(df, default_source="Import CSV"):
     """
 
     report = {"created": 0, "duplicates": [], "errors": []}
+    stages = database.get_stage_names()
 
     for position, row in enumerate(df.to_dict("records")):
         line = position + 2
         data = {key: (value or "").strip() for key, value in row.items()}
         data["source"] = data.get("source") or default_source
 
-        errors = validate_prospect(data)
+        errors = validate_prospect(data, stages)
         if errors:
             report["errors"].append({"line": line, "reason": " ".join(errors)})
             continue

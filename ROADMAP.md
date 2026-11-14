@@ -29,8 +29,13 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ✅ Heures affichées en heure locale
 - ⬜ Plus tard : modifier / supprimer une interaction saisie par erreur, synchronisation automatique (phases 6-7)
 
-## Phase 4 — Pipeline ⬜
-Kanban, étapes personnalisables, filtres, verticales, vue priorisée.
+## Phase 4 — Pipeline ✅
+- ✅ Kanban avec changement d'étape depuis la carte
+- ✅ Étapes personnalisables (renommer, réordonner, ajouter, supprimer, fermer)
+- ✅ Filtres : recherche, verticale, commercial, inactivité ; étapes fermées masquables
+- ✅ Prospects sans activité récente (seuil réglable)
+- ✅ Vue priorisée (règles provisoires, raisons affichées)
+- ⬜ Plus tard : filtre par score (phase 5), glisser-déposer (composant tiers, à valider)
 
 ## Phase 5 — Scoring ⬜
 Fit, Engagement, Intent, score global, historique et explications, calibration.

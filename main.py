@@ -33,8 +33,26 @@ from core.activity_service import (
     format_duration
 )
 
+from database import (
+    get_stages,
+    get_stage_names,
+    add_stage,
+    rename_stage,
+    move_stage,
+    set_stage_closed,
+    delete_stage,
+    set_prospect_stage
+)
+
+from core.pipeline_service import (
+    DEFAULT_STALE_DAYS,
+    build_board,
+    days_since,
+    is_stale,
+    prioritize
+)
+
 from core.prospect_service import (
-    STATUSES,
     CSV_TEMPLATE,
     create_prospect,
     update_prospect,
@@ -56,6 +74,9 @@ st.set_page_config(
 initialize_database()
 
 prospects = get_all_prospects()
+
+# Etapes du pipeline (personnalisables) : servent aussi de liste de statuts
+stage_names = get_stage_names()
 
 # ==========================================
 # 2. IDENTITE VISUELLE
@@ -116,7 +137,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.5.0")
+st.sidebar.caption("VERSION 0.6.0")
 
 
 # ==========================================
@@ -149,7 +170,7 @@ def prospect_form(form_key, verticals, submit_label, defaults=None):
     if defaults.get("vertical") and defaults["vertical"] not in vertical_options:
         vertical_options.append(defaults["vertical"])
 
-    status_options = list(STATUSES)
+    status_options = list(stage_names)
     if defaults.get("status") and defaults["status"] not in status_options:
         status_options.append(defaults["status"])
 
@@ -176,7 +197,7 @@ def prospect_form(form_key, verticals, submit_label, defaults=None):
         status = col2.selectbox(
             "Status",
             status_options,
-            index=status_options.index(defaults.get("status") or "A prospecter")
+            index=status_options.index(defaults.get("status") or status_options[0])
         )
 
         email = col1.text_input("Email", value=defaults.get("email") or "")
@@ -273,6 +294,57 @@ def interaction_form(form_key, prospect_options=None):
     contact_id = prospect_options[contact_label] if prospect_options else None
 
     return submitted, contact_id, data
+
+
+def _move_prospect(contact_id, widget_key):
+    """Appele quand l'etape d'une carte change (callback du selectbox).
+
+    Concept : un "callback" est une fonction que Streamlit execute juste
+    apres le changement d'un widget, avant de relancer la page. La page
+    affiche donc directement le prospect dans sa nouvelle colonne.
+    """
+
+    ok, message = set_prospect_stage(contact_id, st.session_state[widget_key])
+    st.session_state["flash"] = message if ok else f"Error: {message}"
+
+
+def pipeline_card(prospect, summary, stale_days):
+    """Carte d'un prospect dans le tableau Kanban."""
+
+    with st.container(border=True):
+
+        st.markdown(f"**{prospect['first_name']} {prospect['last_name']}**")
+        st.caption(f"{prospect['company_name']} · {prospect['vertical'] or '—'}")
+
+        if summary.get("next_task_title"):
+            due = summary["next_task_due"] or ""
+            text = f"→ {due or 'no date'} · {summary['next_task_title']}"
+
+            if due and due[:10] < date.today().isoformat():
+                st.caption(f":red[Overdue {text}]")
+            else:
+                st.caption(text)
+
+        days = days_since(summary.get("last_interaction_at"))
+
+        if days is None:
+            st.caption(":orange[Never contacted]")
+        elif days >= stale_days:
+            st.caption(f":orange[No activity for {days} days]")
+        else:
+            st.caption(f"Last activity: {days} day(s) ago")
+
+        key = f"stage_of_{prospect['id']}"
+
+        st.selectbox(
+            "Stage",
+            stage_names,
+            index=stage_names.index(prospect["status"]) if prospect["status"] in stage_names else 0,
+            key=key,
+            label_visibility="collapsed",
+            on_change=_move_prospect,
+            args=(prospect["id"], key)
+        )
 
 
 def follow_up_card(task, show_prospect=True):
@@ -397,19 +469,25 @@ elif page == "Prospects":
             st.info("No prospects registered. Create one or import a CSV file.")
 
         else:
-            col_search, col_vertical, col_status, col_source = st.columns([2, 1, 1, 1])
+            col_search, col_vertical, col_status, col_source, col_owner = st.columns(
+                [2, 1, 1, 1, 1]
+            )
 
             query = col_search.text_input(
                 "Search", placeholder="Name, company, email or phone"
             )
             selected_verticals = col_vertical.multiselect("Vertical", verticals)
-            selected_statuses = col_status.multiselect("Status", STATUSES)
+            selected_statuses = col_status.multiselect("Status", stage_names)
             selected_sources = col_source.multiselect(
                 "Source", sorted({p["source"] for p in prospects if p["source"]})
             )
+            selected_owners = col_owner.multiselect(
+                "Sales owner", sorted({p["owner"] for p in prospects if p["owner"]})
+            )
 
             filtered = filter_prospects(
-                prospects, query, selected_verticals, selected_statuses, selected_sources
+                prospects, query, selected_verticals, selected_statuses,
+                selected_sources, selected_owners
             )
 
             st.caption(f"{len(filtered)} of {len(prospects)} prospects")
@@ -785,8 +863,201 @@ elif page == "Prospect Details":
 # ==========================================
 
 elif page == "Prospecting Pipeline":
+
     st.title("Prospecting Pipeline")
-    st.info("Pipeline development is coming next.")
+    st.caption("Where every prospect stands — and who needs your attention.")
+
+    show_flash_message()
+
+    stages = get_stages()
+    summaries = get_activity_summary()
+
+    # ---------- FILTRES (communs au tableau et aux priorites) ----------
+
+    col_search, col_vertical, col_owner, col_days, col_toggles = st.columns([2, 1, 1, 1, 1])
+
+    query = col_search.text_input(
+        "Search", placeholder="Name, company, email or phone", key="pipeline_search"
+    )
+    selected_verticals = col_vertical.multiselect(
+        "Vertical", get_verticals(), key="pipeline_verticals"
+    )
+    selected_owners = col_owner.multiselect(
+        "Sales owner",
+        sorted({p["owner"] for p in prospects if p["owner"]}),
+        key="pipeline_owners"
+    )
+    stale_days = col_days.number_input(
+        "Inactive after (days)", min_value=1, value=DEFAULT_STALE_DAYS, key="stale_days"
+    )
+    only_stale = col_toggles.toggle("Only inactive", key="pipeline_only_stale")
+    show_closed = col_toggles.toggle("Show closed stages", key="pipeline_show_closed")
+
+    filtered = filter_prospects(
+        prospects, query, selected_verticals, None, None, selected_owners
+    )
+
+    if only_stale:
+        filtered = [
+            p for p in filtered if is_stale(summaries.get(p["id"]), stale_days)
+        ]
+
+    tab_board, tab_priorities, tab_stages = st.tabs(
+        ["Board", "Priorities", "Stages"], key="pipeline_tabs"
+    )
+
+    # ---------- TABLEAU KANBAN ----------
+
+    with tab_board:
+
+        visible_stages = [s for s in stages if show_closed or not s["is_closed"]]
+        board = build_board(filtered, stages)
+
+        hidden = sum(len(board[s["name"]]) for s in stages if s not in visible_stages)
+
+        st.caption(
+            f"{len(filtered)} prospect(s)"
+            + (f" · {hidden} in closed stages (hidden)" if hidden else "")
+        )
+
+        MAX_CARDS = 50
+
+        for column, stage in zip(st.columns(len(visible_stages)), visible_stages):
+
+            cards = board[stage["name"]]
+
+            with column:
+                st.markdown(f"**{stage['name']}**")
+                st.caption(f"{len(cards)} prospect(s)" + (" · closed" if stage["is_closed"] else ""))
+
+                for prospect in cards[:MAX_CARDS]:
+                    pipeline_card(prospect, summaries.get(prospect["id"], {}), stale_days)
+
+                if len(cards) > MAX_CARDS:
+                    st.caption(f"+ {len(cards) - MAX_CARDS} more — narrow the filters.")
+
+    # ---------- VUE PRIORISEE ----------
+
+    with tab_priorities:
+
+        st.caption(
+            "Provisional rules until the scoring engine (phase 5): overdue follow-up +3, "
+            "follow-up due today +2, never contacted +1, inactive +1. "
+            "Closed stages are excluded. Ties go to the most advanced stage."
+        )
+
+        ranked = prioritize(filtered, stages, summaries, stale_days)
+
+        if ranked:
+            st.dataframe(
+                pd.DataFrame([
+                    {
+                        "Priority": item["points"],
+                        "Prospect": f"{item['prospect']['first_name']} {item['prospect']['last_name']}",
+                        "Company": item["prospect"]["company_name"],
+                        "Stage": item["prospect"]["status"],
+                        "Why": " · ".join(item["reasons"]),
+                        "Next follow-up": item["summary"].get("next_task_due"),
+                        "Last activity": item["summary"].get("last_interaction_at"),
+                    }
+                    for item in ranked
+                ]),
+                width="stretch",
+                hide_index=True
+            )
+        else:
+            st.success("Nothing urgent: no overdue follow-up and no inactive prospect.")
+
+    # ---------- GESTION DES ETAPES ----------
+
+    with tab_stages:
+
+        st.caption(
+            "Renaming a stage also updates every prospect in it. "
+            "A closed stage means the prospect is no longer worked "
+            "(hidden from the board by default, excluded from priorities)."
+        )
+
+        counts = {s["name"]: 0 for s in stages}
+        for p in prospects:
+            counts[p["status"]] = counts.get(p["status"], 0) + 1
+
+        for index, stage in enumerate(stages):
+
+            with st.container(border=True):
+
+                c_name, c_count, c_closed, c_up, c_down, c_actions = st.columns(
+                    [3, 1.2, 1, 0.6, 0.6, 1.4], vertical_alignment="center"
+                )
+
+                new_name = c_name.text_input(
+                    "Stage name", value=stage["name"],
+                    key=f"stage_name_{stage['id']}", label_visibility="collapsed"
+                )
+
+                c_count.caption(f"{counts.get(stage['name'], 0)} prospect(s)")
+
+                closed = c_closed.checkbox(
+                    "Closed", value=stage["is_closed"], key=f"stage_closed_{stage['id']}"
+                )
+
+                if closed != stage["is_closed"]:
+                    set_stage_closed(stage["id"], closed)
+                    st.rerun()
+
+                if c_up.button("▲", key=f"stage_up_{stage['id']}", disabled=index == 0):
+                    move_stage(stage["id"], -1)
+                    st.rerun()
+
+                if c_down.button("▼", key=f"stage_down_{stage['id']}", disabled=index == len(stages) - 1):
+                    move_stage(stage["id"], 1)
+                    st.rerun()
+
+                if new_name.strip() != stage["name"]:
+                    if c_actions.button("Rename", key=f"stage_rename_{stage['id']}", type="primary"):
+                        ok, message = rename_stage(stage["id"], new_name)
+
+                        if ok:
+                            st.session_state["flash"] = message
+                            st.rerun()
+                        else:
+                            st.error(message)
+
+                with c_actions.popover("Delete"):
+
+                    others = [s["name"] for s in stages if s["id"] != stage["id"]]
+                    target = None
+
+                    if counts.get(stage["name"]):
+                        target = st.selectbox(
+                            f"Move its {counts[stage['name']]} prospect(s) to",
+                            others, key=f"stage_target_{stage['id']}"
+                        )
+
+                    if st.button("Delete stage", key=f"stage_delete_{stage['id']}", type="primary"):
+                        ok, message = delete_stage(stage["id"], move_to=target)
+
+                        if ok:
+                            st.session_state["flash"] = message
+                            st.rerun()
+                        else:
+                            st.error(message)
+
+        with st.form("add_stage_form", clear_on_submit=True):
+
+            col_name, col_closed, col_button = st.columns([3, 1, 1], vertical_alignment="bottom")
+
+            stage_name = col_name.text_input("New stage")
+            stage_closed = col_closed.checkbox("Closed stage")
+
+            if col_button.form_submit_button("Add stage", width="stretch"):
+                ok, message = add_stage(stage_name, stage_closed)
+
+                if ok:
+                    st.session_state["flash"] = message
+                    st.rerun()
+                else:
+                    st.error(message)
 
 elif page == "Activity":
 

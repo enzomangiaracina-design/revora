@@ -11,6 +11,24 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = BASE_DIR / "revora.db"
 
+# Etapes de prospection creees au premier lancement (modifiables ensuite
+# depuis la page Pipeline). "A prospecter" est la valeur par defaut deja
+# utilisee dans la base : elle est conservee telle quelle.
+DEFAULT_STAGES = [
+    "A prospecter",
+    "Première tentative",
+    "En contact",
+    "Intéressé",
+    "Rendez-vous obtenu",
+    "A relancer",
+    "Non intéressé",
+    "Disqualifié",
+]
+
+# Etapes "fermees" : le prospect n'est plus a travailler (exclu des priorites
+# et de la detection d'inactivite).
+DEFAULT_CLOSED_STAGES = {"Non intéressé", "Disqualifié"}
+
 
 def get_connection():
     """Ouvre une connexion a la base SQLite."""
@@ -128,6 +146,19 @@ def initialize_database():
         )
     """)
 
+    # ETAPES DU PIPELINE (personnalisables)
+    # contacts.status contient le NOM de l'etape.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_stages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            position INTEGER NOT NULL,
+            is_closed INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+
+    _seed_pipeline_stages(cursor)
+
     # MIGRATIONS (phase 2) : ajout de colonnes sur une base existante,
     # sans toucher aux données déjà enregistrées.
     _add_column_if_missing(cursor, "contacts", "source", "TEXT")
@@ -142,6 +173,39 @@ def initialize_database():
 
     print("REVORA database initialized successfully.")
     print(f"Database location: {DATABASE_PATH}")
+
+
+def _seed_pipeline_stages(cursor):
+    """Cree les etapes par defaut si la table est vide.
+
+    Tout statut deja utilise par un prospect mais absent de la liste est
+    ajoute a la fin : aucun prospect ne se retrouve sans etape.
+    """
+
+    if cursor.execute("SELECT count(*) FROM pipeline_stages").fetchone()[0] == 0:
+        for position, name in enumerate(DEFAULT_STAGES):
+            cursor.execute(
+                "INSERT INTO pipeline_stages (name, position, is_closed) VALUES (?, ?, ?)",
+                (name, position, int(name in DEFAULT_CLOSED_STAGES))
+            )
+
+    existing = {row[0] for row in cursor.execute("SELECT name FROM pipeline_stages")}
+    used = [
+        row[0] for row in cursor.execute(
+            "SELECT DISTINCT status FROM contacts WHERE status IS NOT NULL AND status != ''"
+        )
+    ]
+
+    for name in used:
+        if name not in existing:
+            cursor.execute(
+                """
+                INSERT INTO pipeline_stages (name, position)
+                VALUES (?, (SELECT coalesce(max(position), -1) + 1 FROM pipeline_stages))
+                """,
+                (name,)
+            )
+            existing.add(name)
 
 
 def _add_column_if_missing(cursor, table, column, column_type):
@@ -179,20 +243,16 @@ def _get_or_create_company(cursor, company_name, vertical):
 
     vertical = _clean(vertical)
 
-    # "IS" (et non "=") pour que deux verticales vides (NULL) soient considerees egales
-    cursor.execute(
-        """
-        SELECT id FROM companies
-        WHERE lower(name) = lower(?)
-        AND vertical IS ?
-        """,
-        (company_name.strip(), vertical)
-    )
+    # "IS" (et non "=") pour que deux verticales vides (NULL) soient considerees egales.
+    # Le nom est compare en Python (_same_text) pour gerer les accents.
+    candidates = cursor.execute(
+        "SELECT id, name FROM companies WHERE vertical IS ? ORDER BY id",
+        (vertical,)
+    ).fetchall()
 
-    company = cursor.fetchone()
-
-    if company:
-        return company["id"]
+    for company in candidates:
+        if _same_text(company["name"], company_name):
+            return company["id"]
 
     cursor.execute(
         """
@@ -509,6 +569,250 @@ def delete_prospect(contact_id):
     except Exception:
         connection.rollback()
         raise
+
+    finally:
+        connection.close()
+
+
+# ==========================================
+# 5 ter. ETAPES DU PIPELINE
+# ==========================================
+
+def get_stages():
+    """Etapes du pipeline, dans l'ordre d'affichage."""
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        "SELECT id, name, position, is_closed FROM pipeline_stages ORDER BY position, id"
+    ).fetchall()
+
+    connection.close()
+
+    return [dict(row) | {"is_closed": bool(row["is_closed"])} for row in rows]
+
+
+def get_stage_names():
+    """Noms des etapes, dans l'ordre."""
+
+    return [stage["name"] for stage in get_stages()]
+
+
+def _same_text(a, b):
+    """Compare deux textes sans tenir compte des majuscules, accents compris.
+
+    Concept : lower() de SQLite ne convertit que les lettres sans accent
+    ("É" reste "É"). La comparaison se fait donc en Python avec casefold(),
+    qui gere toutes les lettres ("SOCIÉTÉ" == "société").
+    """
+
+    return (a or "").strip().casefold() == (b or "").strip().casefold()
+
+
+def _stage_name_taken(connection, name, exclude_id=None):
+    return any(
+        _same_text(row["name"], name)
+        for row in connection.execute(
+            "SELECT name FROM pipeline_stages WHERE id IS NOT ?", (exclude_id,)
+        )
+    )
+
+
+def add_stage(name, is_closed=False):
+    """Ajoute une etape a la fin du pipeline. Retourne (succes, message)."""
+
+    name = _clean(name)
+
+    if not name:
+        return False, "Le nom de l'etape est obligatoire."
+
+    connection = get_connection()
+
+    try:
+        if _stage_name_taken(connection, name):
+            return False, f"L'etape « {name} » existe deja."
+
+        connection.execute(
+            """
+            INSERT INTO pipeline_stages (name, position, is_closed)
+            VALUES (?, (SELECT coalesce(max(position), -1) + 1 FROM pipeline_stages), ?)
+            """,
+            (name, int(is_closed))
+        )
+
+        connection.commit()
+
+        return True, f"Etape « {name} » ajoutee."
+
+    finally:
+        connection.close()
+
+
+def rename_stage(stage_id, new_name):
+    """Renomme une etape ET met a jour les prospects qui y sont (transaction)."""
+
+    new_name = _clean(new_name)
+
+    if not new_name:
+        return False, "Le nom de l'etape est obligatoire."
+
+    connection = get_connection()
+
+    try:
+        stage = connection.execute(
+            "SELECT name FROM pipeline_stages WHERE id = ?", (stage_id,)
+        ).fetchone()
+
+        if not stage:
+            return False, "Etape introuvable."
+
+        if _stage_name_taken(connection, new_name, exclude_id=stage_id):
+            return False, f"L'etape « {new_name} » existe deja."
+
+        connection.execute(
+            "UPDATE contacts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE status = ?",
+            (new_name, stage["name"])
+        )
+        connection.execute(
+            "UPDATE pipeline_stages SET name = ? WHERE id = ?",
+            (new_name, stage_id)
+        )
+
+        connection.commit()
+
+        return True, f"Etape renommee en « {new_name} »."
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def move_stage(stage_id, step):
+    """Deplace une etape d'un cran (step = -1 vers la gauche, +1 vers la droite)."""
+
+    stages = get_stages()
+    index = next((i for i, s in enumerate(stages) if s["id"] == stage_id), None)
+
+    if index is None or not 0 <= index + step < len(stages):
+        return False
+
+    # On renumerote toutes les positions (0, 1, 2...) apres l'echange
+    stages[index], stages[index + step] = stages[index + step], stages[index]
+
+    connection = get_connection()
+
+    try:
+        for position, stage in enumerate(stages):
+            connection.execute(
+                "UPDATE pipeline_stages SET position = ? WHERE id = ?",
+                (position, stage["id"])
+            )
+
+        connection.commit()
+
+        return True
+
+    finally:
+        connection.close()
+
+
+def set_stage_closed(stage_id, is_closed):
+    """Marque une etape comme fermee (prospect plus a travailler) ou ouverte."""
+
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            "UPDATE pipeline_stages SET is_closed = ? WHERE id = ?",
+            (int(is_closed), stage_id)
+        )
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def delete_stage(stage_id, move_to=None):
+    """Supprime une etape. Ses prospects sont d'abord deplaces vers `move_to`.
+
+    Refuse si l'etape contient des prospects et qu'aucune etape de
+    destination n'est donnee, ou s'il s'agit de la derniere etape.
+    Retourne (succes, message).
+    """
+
+    connection = get_connection()
+
+    try:
+        stage = connection.execute(
+            "SELECT name FROM pipeline_stages WHERE id = ?", (stage_id,)
+        ).fetchone()
+
+        if not stage:
+            return False, "Etape introuvable."
+
+        if connection.execute("SELECT count(*) FROM pipeline_stages").fetchone()[0] <= 1:
+            return False, "Le pipeline doit garder au moins une etape."
+
+        count = connection.execute(
+            "SELECT count(*) FROM contacts WHERE status = ?", (stage["name"],)
+        ).fetchone()[0]
+
+        if count:
+            target = connection.execute(
+                "SELECT name FROM pipeline_stages WHERE name = ? AND id != ?",
+                (move_to, stage_id)
+            ).fetchone()
+
+            if not target:
+                return False, (
+                    f"{count} prospect(s) sont dans « {stage['name']} » : "
+                    "choisissez une etape de destination."
+                )
+
+            connection.execute(
+                "UPDATE contacts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE status = ?",
+                (target["name"], stage["name"])
+            )
+
+        connection.execute("DELETE FROM pipeline_stages WHERE id = ?", (stage_id,))
+
+        connection.commit()
+
+        return True, f"Etape « {stage['name']} » supprimee."
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def set_prospect_stage(contact_id, stage_name):
+    """Deplace un prospect dans une etape du pipeline. Retourne (succes, message)."""
+
+    connection = get_connection()
+
+    try:
+        if not connection.execute(
+            "SELECT 1 FROM pipeline_stages WHERE name = ?", (stage_name,)
+        ).fetchone():
+            return False, f"Etape inconnue : {stage_name}"
+
+        cursor = connection.execute(
+            "UPDATE contacts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (stage_name, contact_id)
+        )
+
+        if cursor.rowcount == 0:
+            return False, "Prospect introuvable."
+
+        connection.commit()
+
+        return True, f"Prospect deplace vers « {stage_name} »."
 
     finally:
         connection.close()
