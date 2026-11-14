@@ -85,6 +85,27 @@ from core.score_service import (
     calibration_by_stage
 )
 
+from database import (
+    get_objections,
+    set_objection_status,
+    delete_objection,
+    get_objection_responses,
+    set_objection_response
+)
+from core.objection_service import (
+    STATUSES as OBJECTION_STATUSES,
+    PLAYBOOK_PLACEHOLDER,
+    categories as objection_categories,
+    record_objection,
+    count_by,
+    filter_period,
+    weekly_trend,
+    resolution_by_category,
+    anonymized_examples,
+    call_preparation,
+    format_day
+)
+
 from database import get_integrations, get_sync_logs
 from core.sync_service import run_sync, import_hubspot_contacts
 from integrations.config import get_secret
@@ -143,7 +164,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.10.0")
+st.sidebar.caption("VERSION 0.11.0")
 
 
 # ==========================================
@@ -283,6 +304,20 @@ def interaction_form(form_key, prospect_options=None):
             help="Creates a follow-up task with the next step as title."
         )
 
+        col1, col2 = st.columns(2)
+
+        objection_category = col1.selectbox(
+            "Objection raised (optional)",
+            objection_categories(get_objections()),
+            index=None,
+            accept_new_options=True,
+            placeholder="None — only if the prospect actually said it",
+        )
+        objection_verbatim = col2.text_input(
+            "Objection wording (optional)",
+            placeholder="What the prospect said, in their words",
+        )
+
         submitted = st.form_submit_button("Save interaction", width="stretch")
 
     data = {
@@ -295,6 +330,8 @@ def interaction_form(form_key, prospect_options=None):
         "occurred_at": datetime.combine(day, time),
         "duration_minutes": duration,
         "follow_up_date": follow_up_date,
+        "objection_category": objection_category,
+        "objection_verbatim": objection_verbatim,
     }
 
     contact_id = prospect_options[contact_label] if prospect_options else None
@@ -581,7 +618,8 @@ elif page == "Prospects":
                 st.warning(
                     f"This permanently deletes **{selected_label}** together with "
                     f"{counts['interactions']} interaction(s), {counts['tasks']} "
-                    f"follow-up(s) and {counts['scores']} score record(s). "
+                    f"follow-up(s), {counts['objections']} objection(s) and "
+                    f"{counts['scores']} score record(s). "
                     "The company is kept. This cannot be undone."
                 )
 
@@ -839,6 +877,32 @@ elif page == "Prospect Details":
                     st.session_state["flash"] = "Qualification saved. Score updated."
                     st.rerun()
 
+            # PREPARATION DU PROCHAIN APPEL (objections deja exprimees)
+
+            preparation = call_preparation(contact_id)
+
+            with st.expander(
+                f"Prepare the next call — {len(preparation)} objection type(s) already raised",
+                expanded=any(item["open"] for item in preparation),
+            ):
+                if not preparation:
+                    st.caption("No objection recorded for this prospect yet.")
+
+                for item in preparation:
+                    st.markdown(
+                        f"**{item['category']}** · raised {item['count']} time(s), "
+                        f"last on {format_day(item['last_seen'])}"
+                        + (f" · :orange[{item['open']} still open]" if item["open"] else "")
+                    )
+
+                    for verbatim in item["verbatims"]:
+                        st.caption(f"“{verbatim}”")
+
+                    if item["response"]:
+                        st.info(item["response"])
+                    else:
+                        st.caption("No recommended response yet — add one in Objections › Playbook.")
+
             st.divider()
 
             # ACTIVITY COUNTERS (calcules automatiquement)
@@ -919,6 +983,73 @@ elif page == "Prospect Details":
 
             else:
                 st.info("No interactions recorded yet.")
+
+            st.divider()
+
+            # OBJECTIONS DU PROSPECT
+
+            st.subheader("Objections")
+
+            prospect_objections = get_objections(contact_id)
+
+            for objection in prospect_objections:
+                with st.container(border=True):
+
+                    col_text, col_status, col_delete = st.columns([5, 2, 1], vertical_alignment="center")
+
+                    col_text.markdown(f"**{objection['category']}**")
+                    col_text.caption(
+                        f"{objection['occurred_at_local']} · stage: {objection['stage'] or '—'}"
+                        f" · {objection['source']}"
+                    )
+
+                    if objection["verbatim"]:
+                        col_text.write(f"“{objection['verbatim']}”")
+
+                    new_status = col_status.selectbox(
+                        "Status", OBJECTION_STATUSES,
+                        index=OBJECTION_STATUSES.index(objection["status"])
+                        if objection["status"] in OBJECTION_STATUSES else 0,
+                        key=f"objection_status_{objection['id']}",
+                        label_visibility="collapsed",
+                    )
+
+                    if new_status != objection["status"]:
+                        set_objection_status(objection["id"], new_status)
+                        st.session_state["flash"] = f"Objection marked as {new_status}."
+                        st.rerun()
+
+                    if col_delete.button(
+                        "", icon=":material/delete:", key=f"objection_delete_{objection['id']}",
+                        help="Delete this objection (entered by mistake)",
+                    ):
+                        delete_objection(objection["id"])
+                        st.session_state["flash"] = "Objection deleted."
+                        st.rerun()
+
+            with st.form(f"objection_form_{contact_id}", clear_on_submit=True):
+
+                st.caption(
+                    "Record only what the prospect actually said. "
+                    "Objections can also be noted when recording an interaction."
+                )
+
+                col1, col2 = st.columns([1, 2])
+
+                category = col1.selectbox(
+                    "Category", objection_categories(get_objections()),
+                    index=None, accept_new_options=True, placeholder="Choose or type",
+                )
+                verbatim = col2.text_input("Wording (optional)")
+
+                if st.form_submit_button("Add objection", width="stretch"):
+                    ok, message = record_objection(contact_id, category, verbatim)
+
+                    if ok:
+                        st.session_state["flash"] = message
+                        st.rerun()
+                    else:
+                        st.error(message)
 
             st.divider()
 
@@ -1378,8 +1509,190 @@ elif page == "Activity":
                     st.error(message)
 
 elif page == "Objections":
+
     st.title("Objection Intelligence")
-    st.info("Objection analysis is coming next.")
+    st.caption(
+        "Every objection your prospects actually expressed — and how to answer it next time. "
+        "Nothing here is guessed: only recorded objections are counted."
+    )
+
+    show_flash_message()
+
+    all_objections = get_objections()
+
+    # ---------- FILTRES ----------
+
+    col_period, col_vertical, _ = st.columns([1, 2, 2])
+
+    period = col_period.selectbox(
+        "Period", ["Last 30 days", "Last 90 days", "All time"], index=2, key="objections_period"
+    )
+    verticals_used = sorted({o["vertical"] for o in all_objections if o["vertical"]})
+    selected_verticals = col_vertical.multiselect("Vertical", verticals_used, key="objections_verticals")
+
+    objections = filter_period(
+        all_objections, {"Last 30 days": 30, "Last 90 days": 90}.get(period)
+    )
+
+    if selected_verticals:
+        objections = [o for o in objections if o["vertical"] in selected_verticals]
+
+    # ---------- INDICATEURS ----------
+
+    by_category = count_by(objections, "category")
+    handled = sum(1 for o in objections if o["status"] == "Handled")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("Objections", len(objections))
+    col2.metric("Open", sum(1 for o in objections if o["status"] == "Open"))
+    col3.metric("Handled rate", f"{round(handled / len(objections) * 100)} %" if objections else "—")
+    col4.metric("Most frequent", by_category[0][0] if by_category else "—")
+
+    tab_insights, tab_playbook, tab_log = st.tabs(
+        ["Insights", "Playbook", "Log"], key="objections_tabs"
+    )
+
+    # ---------- ANALYSE ----------
+
+    with tab_insights:
+
+        if not objections:
+            st.info(
+                "No objection recorded for this period. Note objections when recording a call "
+                "or an email, or from a prospect file."
+            )
+
+        else:
+            col_left, col_right = st.columns(2)
+
+            with col_left:
+                st.markdown("**Most frequent objections**")
+                st.bar_chart(
+                    pd.DataFrame(by_category, columns=["Category", "Objections"]).set_index("Category"),
+                    horizontal=True,
+                    sort=False,  # garde l'ordre des données : la plus fréquente en premier
+                )
+
+            with col_right:
+                st.markdown("**Evolution per week**")
+                trend = weekly_trend(objections)
+                st.bar_chart(
+                    pd.DataFrame.from_dict(trend, orient="index").fillna(0).astype(int),
+                    stack=True,
+                )
+
+            def pivot(field, label):
+                frame = pd.DataFrame(objections)
+                frame[field] = frame[field].fillna("Unknown")
+                table = pd.crosstab(frame[field], frame["category"])
+                table["Total"] = table.sum(axis=1)
+                return table.sort_values("Total", ascending=False).rename_axis(label)
+
+            col_left, col_right = st.columns(2)
+
+            with col_left:
+                st.markdown("**By vertical**")
+                st.dataframe(pivot("vertical", "Vertical"), width="stretch")
+
+            with col_right:
+                st.markdown("**By pipeline stage** (stage when the objection was raised)")
+                st.dataframe(pivot("stage", "Stage"), width="stretch")
+
+            st.markdown("**By company** (top 10)")
+            st.dataframe(pivot("company_name", "Company").head(10), width="stretch")
+
+            st.markdown("**How well each objection is handled**")
+            st.dataframe(pd.DataFrame(resolution_by_category(objections)), width="stretch", hide_index=True)
+
+    # ---------- PLAYBOOK : reponses recommandees ----------
+
+    with tab_playbook:
+
+        st.caption(
+            "Write your recommended answer for each objection. It appears in the prospect file "
+            "(“Prepare the next call”) whenever this objection was raised. "
+            "Examples are anonymized: names, companies, emails and phone numbers are removed."
+        )
+
+        responses = get_objection_responses()
+        counts = dict(count_by(all_objections, "category"))
+        ordered = sorted(
+            objection_categories(all_objections),
+            key=lambda c: (-counts.get(c, 0), objection_categories(all_objections).index(c)),
+        )
+
+        for category in ordered:
+            with st.container(border=True):
+
+                st.markdown(f"**{category}** · {counts.get(category, 0)} time(s)")
+
+                for example in anonymized_examples(all_objections, category, limit=3):
+                    st.caption(f"“{example}”")
+
+                with st.form(f"playbook_{category}"):
+
+                    response = st.text_area(
+                        "Recommended response",
+                        value=responses.get(category, ""),
+                        placeholder=PLAYBOOK_PLACEHOLDER,
+                        height=110,
+                        label_visibility="collapsed",
+                    )
+
+                    if st.form_submit_button("Save response"):
+                        set_objection_response(category, response)
+                        st.session_state["flash"] = f"Response saved for “{category}”."
+                        st.rerun()
+
+    # ---------- JOURNAL ----------
+
+    with tab_log:
+
+        if not objections:
+            st.info("No objection for these filters.")
+
+        else:
+            log = pd.DataFrame([
+                {
+                    "id": o["id"],
+                    "Date": o["occurred_at_local"],
+                    "Prospect": f"{o['first_name']} {o['last_name']}",
+                    "Company": o["company_name"],
+                    "Vertical": o["vertical"],
+                    "Stage": o["stage"],
+                    "Category": o["category"],
+                    "Wording": o["verbatim"],
+                    "Status": o["status"],
+                    "Source": o["source"],
+                }
+                for o in objections
+            ])
+
+            edited = st.data_editor(
+                log,
+                column_config={
+                    "id": None,
+                    "Status": st.column_config.SelectboxColumn("Status", options=OBJECTION_STATUSES, required=True),
+                },
+                disabled=[c for c in log.columns if c != "Status"],
+                hide_index=True,
+                width="stretch",
+                key="objections_log_editor",
+            )
+
+            changes = [
+                (int(row["id"]), row["Status"])
+                for (_, row), (_, before) in zip(edited.iterrows(), log.iterrows())
+                if row["Status"] != before["Status"]
+            ]
+
+            if changes:
+                for objection_id, status in changes:
+                    set_objection_status(objection_id, status)
+                st.session_state.pop("objections_log_editor", None)
+                st.session_state["flash"] = f"{len(changes)} objection status(es) updated."
+                st.rerun()
 
 elif page == "AI Copilot":
     st.title("AI Sales Copilot")

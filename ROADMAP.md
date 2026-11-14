@@ -64,7 +64,12 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 ## Phase 7 — Noota ⏸ (en pause)
 Vérification des API réellement disponibles, appels, transcriptions, rapprochement contacts, analyse IA.
 
-## Phase 8 — Objection Intelligence ⬜
+## Phase 8 — Objection Intelligence 🟡
+- ✅ Saisie manuelle (interaction, fiche prospect), catégories personnalisables, statuts
+- ✅ Statistiques : fréquence, évolution, par verticale, entreprise et étape du pipeline
+- ✅ Playbook de réponses recommandées, exemples anonymisés
+- ✅ Préparation d'appel dans la fiche prospect
+- ⬜ Détection et catégorisation automatiques par IA (après Noota / AI Copilot), toujours à confirmer
 ## Phase 9 — LinkedIn (API officielles uniquement) ⬜
 ## Phase 10 — AI Copilot ⬜
 ## Phase 11 — Multi-utilisateur ⬜

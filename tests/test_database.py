@@ -157,14 +157,18 @@ def test_update_can_move_to_new_company(thomas):
 
 
 def test_delete_prospect_removes_linked_data(thomas):
-    database.add_interaction(thomas, "Call", "Outbound", "No answer", "", "x", "")
+    interaction_id = database.add_interaction(thomas, "Call", "Outbound", "Objection", "", "x", "")
     database.create_task(thomas, "Rappeler", "", "2026-11-18")
+    database.add_objection(thomas, "No budget", interaction_id=interaction_id)
 
-    assert database.count_prospect_activity(thomas) == {"interactions": 1, "tasks": 1, "scores": 0}
+    assert database.count_prospect_activity(thomas) == {
+        "interactions": 1, "tasks": 1, "scores": 0, "objections": 1,
+    }
 
     deleted = database.delete_prospect(thomas)
 
-    assert deleted == {"interactions": 1, "tasks": 1, "scores": 0, "contacts": 1}
+    assert deleted == {"objections": 1, "interactions": 1, "tasks": 1, "scores": 0, "contacts": 1}
+    assert database.get_objections() == []
     assert database.get_prospect_by_id(thomas) is None
     assert database.get_interactions(thomas) == []
     assert database.get_verticals() == ["SaaS"]  # l'entreprise est conservée

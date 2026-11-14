@@ -43,7 +43,8 @@ def log_interaction(contact_id, data, now=None):
 
     `data` contient : channel, direction, event_type, subject, content,
     outcome, occurred_at (datetime locale), duration_minutes (appels),
-    follow_up_date (date optionnelle).
+    follow_up_date (date optionnelle), objection_category et
+    objection_verbatim (optionnels : objection exprimée pendant l'échange).
 
     Retourne (succès, message).
     """
@@ -75,7 +76,7 @@ def log_interaction(contact_id, data, now=None):
     if data["channel"] == "Call" and duration > 0:
         metadata["duration_seconds"] = int(duration * 60)
 
-    database.add_interaction(
+    interaction_id = database.add_interaction(
         contact_id,
         data["channel"],
         data.get("direction"),
@@ -87,12 +88,26 @@ def log_interaction(contact_id, data, now=None):
         metadata=metadata or None,
     )
 
+    done = ["Interaction enregistrée"]
+
+    objection = (data.get("objection_category") or "").strip()
+
+    if objection:
+        database.add_objection(
+            contact_id,
+            objection,
+            verbatim=data.get("objection_verbatim"),
+            interaction_id=interaction_id,
+            occurred_at=occurred_at.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        done.append(f"objection « {objection} » notée")
+
     if follow_up_date:
         title = outcome or f"Follow up after {data['channel'].lower()}"
         database.create_task(contact_id, title, content, follow_up_date.isoformat())
-        return True, "Interaction enregistrée et relance planifiée."
+        done.append("relance planifiée")
 
-    return True, "Interaction enregistrée."
+    return True, ", ".join(done) + "."
 
 
 # ==========================================

@@ -185,6 +185,36 @@ def initialize_database():
         )
     """)
 
+    # OBJECTIONS (phase 8) : uniquement des objections REELLEMENT exprimees.
+    # stage = etape du pipeline au moment de l'objection (pour les statistiques).
+    # source = "manual" (saisie du commercial) ; "ai" plus tard, toujours a confirmer.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS objections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contact_id INTEGER NOT NULL,
+            interaction_id INTEGER,
+            category TEXT NOT NULL,
+            verbatim TEXT,
+            stage TEXT,
+            status TEXT NOT NULL DEFAULT 'Open',
+            source TEXT NOT NULL DEFAULT 'manual',
+            occurred_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (contact_id) REFERENCES contacts(id),
+            FOREIGN KEY (interaction_id) REFERENCES interactions(id)
+        )
+    """)
+
+    # REPONSES RECOMMANDEES par categorie (redigees par le commercial)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS objection_responses (
+            category TEXT PRIMARY KEY,
+            response TEXT NOT NULL,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # REGLAGES (ex. configuration du scoring), stockes en JSON par cle
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS settings (
@@ -578,7 +608,7 @@ def count_prospect_activity(contact_id):
             f"SELECT count(*) FROM {table} WHERE contact_id = ?",
             (contact_id,)
         ).fetchone()[0]
-        for table in ("interactions", "tasks", "scores")
+        for table in ("interactions", "tasks", "scores", "objections")
     }
 
     connection.close()
@@ -602,7 +632,8 @@ def delete_prospect(contact_id):
     try:
         deleted = {}
 
-        for table in ("interactions", "tasks", "scores"):
+        # Les objections d'abord : elles referencent les interactions
+        for table in ("objections", "interactions", "tasks", "scores"):
             deleted[table] = connection.execute(
                 f"DELETE FROM {table} WHERE contact_id = ?",
                 (contact_id,)
@@ -1041,6 +1072,154 @@ def save_score(contact_id, fit, engagement, intent, global_score, explanation):
 
 
 # ==========================================
+# 5 sexies. OBJECTIONS
+# ==========================================
+
+def add_objection(contact_id, category, verbatim=None, *, interaction_id=None,
+                  occurred_at=None, source="manual"):
+    """Enregistre une objection exprimee par un prospect.
+
+    L'etape actuelle du prospect est memorisee avec l'objection.
+    occurred_at : date et heure LOCALES ("AAAA-MM-JJ HH:MM:SS"), absentes = maintenant.
+    Retourne l'identifiant de l'objection.
+    """
+
+    connection = get_connection()
+
+    try:
+        stage = connection.execute(
+            "SELECT status FROM contacts WHERE id = ?", (contact_id,)
+        ).fetchone()
+
+        if not stage:
+            raise ValueError("Prospect introuvable.")
+
+        cursor = connection.execute(
+            """
+            INSERT INTO objections (
+                contact_id, interaction_id, category, verbatim, stage, source, occurred_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, COALESCE(datetime(?, 'utc'), CURRENT_TIMESTAMP))
+            """,
+            (
+                contact_id, interaction_id, category.strip(), _clean(verbatim),
+                stage["status"], source, occurred_at
+            )
+        )
+
+        connection.commit()
+
+        return cursor.lastrowid
+
+    finally:
+        connection.close()
+
+
+def get_objections(contact_id=None):
+    """Objections (toutes, ou celles d'un prospect), les plus recentes d'abord.
+
+    Chaque ligne contient aussi le prospect, l'entreprise et la verticale.
+    """
+
+    query = """
+        SELECT
+            objections.*,
+            datetime(objections.occurred_at, 'localtime') AS occurred_at_local,
+            contacts.first_name,
+            contacts.last_name,
+            contacts.email,
+            contacts.phone,
+            companies.name AS company_name,
+            companies.vertical
+        FROM objections
+
+        JOIN contacts
+            ON objections.contact_id = contacts.id
+
+        LEFT JOIN companies
+            ON contacts.company_id = companies.id
+    """
+
+    params = ()
+
+    if contact_id is not None:
+        query += " WHERE objections.contact_id = ?"
+        params = (contact_id,)
+
+    query += " ORDER BY objections.occurred_at DESC, objections.id DESC"
+
+    connection = get_connection()
+    rows = connection.execute(query, params).fetchall()
+    connection.close()
+
+    return [dict(row) for row in rows]
+
+
+def set_objection_status(objection_id, status):
+    """Met a jour le statut d'une objection (Open / Handled / Lost)."""
+
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            "UPDATE objections SET status = ? WHERE id = ?", (status, objection_id)
+        )
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def delete_objection(objection_id):
+    """Supprime une objection saisie par erreur."""
+
+    connection = get_connection()
+
+    try:
+        connection.execute("DELETE FROM objections WHERE id = ?", (objection_id,))
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def get_objection_responses():
+    """Reponses recommandees : {categorie: texte}."""
+
+    connection = get_connection()
+    rows = connection.execute("SELECT category, response FROM objection_responses").fetchall()
+    connection.close()
+
+    return {row["category"]: row["response"] for row in rows}
+
+
+def set_objection_response(category, response):
+    """Enregistre (ou efface si vide) la reponse recommandee d'une categorie."""
+
+    connection = get_connection()
+
+    try:
+        if _clean(response):
+            connection.execute(
+                """
+                INSERT INTO objection_responses (category, response, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(category) DO UPDATE SET
+                    response = excluded.response,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (category, response.strip())
+            )
+        else:
+            connection.execute("DELETE FROM objection_responses WHERE category = ?", (category,))
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+# ==========================================
 # 5 quinquies. INTEGRATIONS ET SYNCHRONISATIONS
 # ==========================================
 
@@ -1229,7 +1408,7 @@ def add_interaction(
     connection = get_connection()
 
     try:
-        connection.execute(
+        cursor = connection.execute(
             """
             INSERT INTO interactions (
                 contact_id,
@@ -1263,7 +1442,8 @@ def add_interaction(
 
         connection.commit()
 
-        return True
+        # Identifiant de l'interaction creee (vrai, comme avant : >= 1)
+        return cursor.lastrowid
 
     finally:
         connection.close()

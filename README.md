@@ -6,7 +6,7 @@ REVORA est un espace de travail de prospection pour SDR/BDR : il mémorise les
 interactions (appels, emails, notes), organise le portefeuille de prospects et
 aide à décider quelle action effectuer ensuite.
 
-Statut : **prototype local** (Streamlit + SQLite), version 0.10.0.
+Statut : **prototype local** (Streamlit + SQLite), version 0.11.0.
 
 ## Lancer l'application
 
@@ -55,7 +55,7 @@ Les tests utilisent une base temporaire : ils ne touchent jamais `revora.db`.
 | `backups/` | Copies horodatées des fichiers et de la base, faites avant chaque modification importante |
 | `requirements.txt` | Liste des bibliothèques Python nécessaires |
 | `pytest.ini` | Configuration des tests |
-| `core/` | Logique métier : `prospect_service.py` (validation, doublons, filtres, import CSV), `scoring.py` (moteur de scoring Fit / Engagement / Intent), `score_service.py` (configuration, historique, calibration), `deduplication.py` (normalisation email/téléphone), `activity_service.py` (interactions, relances, périodes), `pipeline_service.py` (Kanban, inactivité, priorités), `sync_service.py` (synchronisation, rattachement, déduplication) |
+| `core/` | Logique métier : `prospect_service.py` (validation, doublons, filtres, import CSV), `scoring.py` (moteur de scoring Fit / Engagement / Intent), `score_service.py` (configuration, historique, calibration), `deduplication.py` (normalisation email/téléphone), `activity_service.py` (interactions, relances, périodes), `pipeline_service.py` (Kanban, inactivité, priorités), `objection_service.py` (objections, statistiques, anonymisation), `sync_service.py` (synchronisation, rattachement, déduplication) |
 | `integrations/` | `base.py` (interface commune), `http.py` (client HTTP avec retries), `config.py` (secrets .env), connecteurs `hubspot/` et `gmail/` (hors ligne, voir `docs/INTEGRATIONS.md`) ; `noota/`, `linkedin/` réservés |
 | `ui/` | Interface : `theme.py` (jetons de design, logo, styles), `kanban.py` (tableau du pipeline avec glisser-déposer) |
 | `.streamlit/config.toml` | Thème : palette, police Inter, rayons (source unique des couleurs) |
@@ -92,7 +92,8 @@ git add -A && git commit -m "Description de la modification"
 | Activity | Fonctionnel : indicateurs du jour, timeline globale filtrable, relances par échéance, saisie rapide |
 | Prospecting Pipeline | Fonctionnel : tableau façon HubSpot (glisser-déposer), filtres rapides, tri, vues Table / Priorités / Étapes |
 | Settings | Fonctionnel : configuration du scoring, calibration, état des intégrations (non connectées) |
-| Objections, AI Copilot, Performance | Pages vides (à venir) |
+| Objections | Fonctionnel : saisie, statistiques, playbook de réponses, exemples anonymisés, journal |
+| AI Copilot, Performance | Pages vides (à venir) |
 
 ## Base de données
 

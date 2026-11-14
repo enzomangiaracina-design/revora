@@ -1,5 +1,47 @@
 # CHANGELOG — REVORA
 
+## [0.11.0] — 2026-11-15 — Phase 8 : Objection Intelligence (saisie manuelle)
+
+Règle appliquée : **aucune objection n'est inventée**. Seules les objections saisies par le
+commercial sont enregistrées et comptées. La détection par IA viendra plus tard (à confirmer).
+
+### Ajouté
+- Base : tables `objections` (catégorie, formulation, **étape du pipeline au moment de l'objection**,
+  statut Open / Handled / Lost, source, interaction liée) et `objection_responses` (réponses
+  recommandées par catégorie). Fonctions d'ajout, lecture, statut, suppression.
+- Saisie :
+  - formulaire d'interaction : champs facultatifs « Objection raised » et « Objection wording »,
+    l'objection est reliée à l'interaction ;
+  - fiche prospect : section **Objections** (statut modifiable, suppression d'une erreur, ajout direct).
+- Fiche prospect : **« Prepare the next call »** — objections déjà exprimées (ouvertes d'abord),
+  formulations du prospect et réponse du playbook ; dépliée automatiquement s'il reste une objection ouverte.
+- Page **Objections** :
+  - filtres période et verticale ; indicateurs : total, ouvertes, taux de traitement, plus fréquente ;
+  - **Insights** : objections les plus fréquentes, évolution par semaine, répartition par verticale,
+    par étape du pipeline et par entreprise, taux de traitement par catégorie ;
+  - **Playbook** : réponse recommandée par catégorie (rédigée par le commercial, modèle en 4 temps
+    proposé) et **exemples de formulations anonymisés** (nom, entreprise, emails, téléphones, liens retirés) ;
+  - **Log** : toutes les objections, statut modifiable directement dans le tableau.
+- `core/objection_service.py` : catégories (10 par défaut + nouvelles), statistiques, anonymisation,
+  préparation d'appel.
+- 21 nouveaux tests (179 au total).
+
+### Modifié
+- `add_interaction` retourne l'identifiant de l'interaction créée (toujours « vrai » comme avant).
+- Supprimer un prospect supprime aussi ses objections (dans la même transaction).
+
+### Problèmes trouvés pendant les tests
+- Paramètres `interaction_id` et `occurred_at` rendus **nommés obligatoirement** : passés par
+  position, une date pouvait être prise pour un identifiant (erreur de clé étrangère).
+- Graphique « Most frequent objections » trié par ordre alphabétique → trié par fréquence.
+
+### Tests effectués
+- `python3 -m pytest` : 179 tests réussis ; `revora.db` inchangée.
+- Les 9 pages s'affichent sans erreur (sur une copie).
+- Navigateur sur une copie avec objections fictives : indicateurs, graphiques, playbook (exemples
+  anonymisés), préparation d'appel dans la fiche prospect.
+- Sauvegarde préalable : `backups/20261114-235755/`. Migration : tables `objections`, `objection_responses`.
+
 ## [0.10.0] — 2026-11-14 — Pipeline façon HubSpot (glisser-déposer)
 
 Mise en page inspirée du pipeline HubSpot, aux couleurs de la charte REVORA.
