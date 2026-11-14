@@ -6,7 +6,7 @@ REVORA est un espace de travail de prospection pour SDR/BDR : il mémorise les
 interactions (appels, emails, notes), organise le portefeuille de prospects et
 aide à décider quelle action effectuer ensuite.
 
-Statut : **prototype local** (Streamlit + SQLite), version 0.6.0.
+Statut : **prototype local** (Streamlit + SQLite), version 0.7.0.
 
 ## Lancer l'application
 
@@ -55,7 +55,7 @@ Les tests utilisent une base temporaire : ils ne touchent jamais `revora.db`.
 | `backups/` | Copies horodatées des fichiers et de la base, faites avant chaque modification importante |
 | `requirements.txt` | Liste des bibliothèques Python nécessaires |
 | `pytest.ini` | Configuration des tests |
-| `core/` | Logique métier : `prospect_service.py` (validation, doublons, filtres, import CSV), `scoring.py` (score global), `deduplication.py` (normalisation email/téléphone), `activity_service.py` (interactions, relances, périodes), `pipeline_service.py` (Kanban, inactivité, priorités) |
+| `core/` | Logique métier : `prospect_service.py` (validation, doublons, filtres, import CSV), `scoring.py` (moteur de scoring Fit / Engagement / Intent), `score_service.py` (configuration, historique, calibration), `deduplication.py` (normalisation email/téléphone), `activity_service.py` (interactions, relances, périodes), `pipeline_service.py` (Kanban, inactivité, priorités) |
 | `integrations/` | `base.py` (interface commune des connecteurs) et dossiers HubSpot, Gmail, Noota, LinkedIn (non implémentés) |
 | `ai/` | Copilot, analyse d'appels, détection d'objections (réservés, aucun modèle connecté) |
 | `tests/` | Tests automatiques pytest |
@@ -87,6 +87,7 @@ git add -A && git commit -m "Description de la modification"
 | Prospect Details | Fonctionnel : coordonnées, compteurs, dernière interaction, prochaine action, saisie d'interactions, timeline, relances |
 | Activity | Fonctionnel : indicateurs du jour, timeline globale filtrable, relances par échéance, saisie rapide |
 | Prospecting Pipeline | Fonctionnel : Kanban, étapes personnalisables, filtres, inactivité, vue priorisée |
+| Settings | Fonctionnel : configuration du scoring (profil cible, pondérations, seuils, demi-vie), calibration |
 | Objections, AI Copilot, Performance | Pages vides (à venir) |
 
 ## Base de données

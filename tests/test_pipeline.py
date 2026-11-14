@@ -211,3 +211,10 @@ def test_prioritize():
     assert [(r["prospect"]["id"], r["points"]) for r in ranked] == [(2, 3), (3, 2), (6, 1), (1, 1)]
     assert ranked[0]["reasons"] == ["Overdue follow-up (2026-11-10): Rappel"]
     assert ranked[2]["reasons"] == ["No activity for 44 days"]
+
+
+def test_prioritize_ties_broken_by_score():
+    prospects = [p(1, "A prospecter"), p(2, "A prospecter")]
+    ranked = pipeline.prioritize(prospects, STAGES, {}, today=TODAY, scores={1: 20, 2: 65})
+
+    assert [r["prospect"]["id"] for r in ranked] == [2, 1]

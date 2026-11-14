@@ -1,5 +1,41 @@
 # CHANGELOG — REVORA
 
+## [0.7.0] — 2026-11-14 — Phase 5 : Scoring
+
+### Ajouté
+- **Moteur de scoring** (`core/scoring.py`, sans accès à la base) :
+  - **Fit** : verticales cibles (50) et mots-clés de poste (50), selon le profil cible configuré.
+    Sans profil configuré, le Fit est « non évalué » et le score global est calculé sur les
+    dimensions disponibles (aucune valeur inventée).
+  - **Engagement** : réactions observées du prospect (réponse email, appel entrant, réponse LinkedIn,
+    conversation, réponse positive), avec plafonds par type et décroissance temporelle (demi-vie 30 j).
+    Les tentatives sans réaction ne rapportent **aucun** point.
+  - **Intent** : qualification confirmée par le commercial (besoin, décideur, budget, démo) et réunion
+    obtenue (observée). Étape fermée : 0.
+  - Score global pondéré 35 / 40 / 25, seuils Hot ≥ 70, Warm ≥ 40.
+  - Chaque point est expliqué et typé : observé / confirmé / règle.
+- `core/score_service.py` : configuration, recalcul, historique, aide à la calibration.
+- **Fiche prospect** : score global, Fit / Engagement / Intent, température, « Why this score? »,
+  historique des variations (graphique et tableau), formulaire **Qualification**.
+- **Pipeline** : score sur chaque carte, filtres score minimum et température ; priorités départagées par le score.
+- **Prospects** : colonnes Score et Temperature. **Overview** : indicateur « Hot prospects ».
+- Nouvelle page **Settings** : profil cible, pondérations, seuils, demi-vie, retour aux valeurs par défaut,
+  tableau de calibration (score moyen par étape), rappel des règles de points.
+- Base : table `settings` ; colonnes `contacts.need_identified`, `is_decision_maker`, `budget_confirmed`,
+  `demo_requested` ; colonne `scores.explanation`. L'historique n'enregistre une ligne que si un score change.
+- 19 nouveaux tests (113 au total).
+
+### Tests effectués
+- `python3 -m pytest` : 113 tests réussis ; `revora.db` inchangée.
+- Interface sur une copie : toutes les pages ; qualification → Intent 55, global 21 (sans Fit) ;
+  profil cible enregistré → Fit 100, global 49 ; pondérations invalides refusées ; filtre de score.
+- Navigateur sur une copie : fiche prospect (56 · Warm), explication détaillée des points.
+- Sauvegarde préalable : `backups/20261114-232034/`.
+
+### Limites connues
+- Points, plafonds, pondérations et seuils sont **provisoires** : ils devront être calibrés sur de vraies conversions.
+- Pas encore de signaux « inférés par l'IA » (phases 7, 8 et 10) ni de visites de site.
+
 ## [0.6.0] — 2026-11-14 — Phase 4 : Pipeline
 
 ### Ajouté

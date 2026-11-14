@@ -37,8 +37,14 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ✅ Vue priorisée (règles provisoires, raisons affichées)
 - ⬜ Plus tard : filtre par score (phase 5), glisser-déposer (composant tiers, à valider)
 
-## Phase 5 — Scoring ⬜
-Fit, Engagement, Intent, score global, historique et explications, calibration.
+## Phase 5 — Scoring ✅
+- ✅ Fit Score (profil cible configurable)
+- ✅ Engagement Score (réactions observées, plafonds, décroissance temporelle)
+- ✅ Intent Score (qualification confirmée, réunion obtenue, étape fermée = 0)
+- ✅ Score global pondéré, seuils Hot / Warm / Cold configurables
+- ✅ Historique des variations et explication de chaque point
+- ✅ Aide à la calibration (score moyen par étape)
+- ⬜ Plus tard : calibration sur de vraies conversions, signaux IA, synchronisation des scores vers HubSpot (phase 6)
 
 ## Phase 6 — HubSpot et Gmail ⬜
 OAuth, contacts, emails entrants/sortants, activités, webhooks, déduplication, synchronisation contrôlée.

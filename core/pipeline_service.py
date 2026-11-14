@@ -1,7 +1,8 @@
 """Service pipeline : tableau Kanban, inactivité et priorités.
 
-La PRIORITÉ calculée ici est une règle simple et transparente, provisoire
-en attendant le moteur de scoring (phase 5). Elle ne repose que sur des
+La PRIORITÉ calculée ici mesure l'URGENCE (que faire maintenant ?), en
+complément du score (core/scoring.py) qui mesure le potentiel ; à égalité
+d'urgence, le meilleur score passe devant. Elle ne repose que sur des
 faits enregistrés (relances, dates d'interaction, étape) et chaque prospect
 affiche les raisons de sa priorité. Le nombre de contacts n'augmente jamais
 la priorité : un prospect très sollicité n'est pas "meilleur" pour autant.
@@ -61,16 +62,20 @@ def build_board(prospects, stages):
     return board
 
 
-def prioritize(prospects, stages, summaries, stale_days=DEFAULT_STALE_DAYS, today=None):
+def prioritize(
+    prospects, stages, summaries, stale_days=DEFAULT_STALE_DAYS, today=None, scores=None
+):
     """Classe les prospects des étapes ouvertes par priorité décroissante.
 
     Retourne une liste de dictionnaires :
     {"prospect": ..., "points": n, "reasons": [...], "summary": {...}}.
     Seuls les prospects ayant au moins une raison sont retournés.
-    À égalité de points, l'étape la plus avancée du pipeline passe devant.
+    À égalité de points : le score global le plus élevé (si `scores`
+    {contact_id: score} est fourni), puis l'étape la plus avancée.
     """
 
     today = today or date.today()
+    scores = scores or {}
     today_iso = today.isoformat()
 
     open_positions = {
@@ -114,7 +119,11 @@ def prioritize(prospects, stages, summaries, stale_days=DEFAULT_STALE_DAYS, toda
             })
 
     ranked.sort(
-        key=lambda item: (item["points"], open_positions[item["prospect"]["status"]]),
+        key=lambda item: (
+            item["points"],
+            scores.get(item["prospect"]["id"], 0),
+            open_positions[item["prospect"]["status"]],
+        ),
         reverse=True,
     )
 

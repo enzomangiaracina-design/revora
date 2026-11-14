@@ -29,6 +29,15 @@ DEFAULT_STAGES = [
 # et de la detection d'inactivite).
 DEFAULT_CLOSED_STAGES = {"Non intéressé", "Disqualifié"}
 
+# Informations de qualification CONFIRMEES par le commercial (cases a cocher
+# sur la fiche prospect). Elles alimentent l'Intent Score.
+QUALIFICATION_FIELDS = [
+    "need_identified",
+    "is_decision_maker",
+    "budget_confirmed",
+    "demo_requested",
+]
+
 
 def get_connection():
     """Ouvre une connexion a la base SQLite."""
@@ -159,6 +168,15 @@ def initialize_database():
 
     _seed_pipeline_stages(cursor)
 
+    # REGLAGES (ex. configuration du scoring), stockes en JSON par cle
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # MIGRATIONS (phase 2) : ajout de colonnes sur une base existante,
     # sans toucher aux données déjà enregistrées.
     _add_column_if_missing(cursor, "contacts", "source", "TEXT")
@@ -167,6 +185,13 @@ def initialize_database():
     _add_column_if_missing(cursor, "companies", "industry", "TEXT")
     _add_column_if_missing(cursor, "companies", "size", "TEXT")
     _add_column_if_missing(cursor, "companies", "country", "TEXT")
+
+    # MIGRATIONS (phase 5) : qualification confirmee par le commercial
+    # (0 = non, 1 = oui) et explication des scores
+    for column in QUALIFICATION_FIELDS:
+        _add_column_if_missing(cursor, "contacts", column, "INTEGER DEFAULT 0")
+
+    _add_column_if_missing(cursor, "scores", "explanation", "TEXT")
 
     connection.commit()
     connection.close()
@@ -369,6 +394,10 @@ def get_all_prospects():
             contacts.source,
             contacts.owner,
             contacts.created_at,
+            contacts.need_identified,
+            contacts.is_decision_maker,
+            contacts.budget_confirmed,
+            contacts.demo_requested,
             companies.name AS company_name,
             companies.vertical
         FROM contacts
@@ -813,6 +842,177 @@ def set_prospect_stage(contact_id, stage_name):
         connection.commit()
 
         return True, f"Prospect deplace vers « {stage_name} »."
+
+    finally:
+        connection.close()
+
+
+# ==========================================
+# 5 quater. QUALIFICATION, REGLAGES ET SCORES
+# ==========================================
+
+def update_qualification(contact_id, values):
+    """Enregistre la qualification confirmee d'un prospect.
+
+    values : {"need_identified": True, "budget_confirmed": False, ...}.
+    Les cles inconnues sont ignorees.
+    """
+
+    fields = [field for field in QUALIFICATION_FIELDS if field in values]
+
+    if not fields:
+        return False
+
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            f"""
+            UPDATE contacts
+            SET {', '.join(f'{field} = ?' for field in fields)},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            [int(bool(values[field])) for field in fields] + [contact_id]
+        )
+
+        connection.commit()
+
+        return True
+
+    finally:
+        connection.close()
+
+
+def get_setting(key, default=None):
+    """Lit un reglage (valeur JSON). Retourne `default` s'il n'existe pas."""
+
+    connection = get_connection()
+    row = connection.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    connection.close()
+
+    return json.loads(row["value"]) if row else default
+
+
+def set_setting(key, value):
+    """Enregistre (ou remplace) un reglage au format JSON."""
+
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            """
+            INSERT INTO settings (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (key, json.dumps(value, ensure_ascii=False))
+        )
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def _score_row(row):
+    item = dict(row)
+
+    try:
+        item["explanation"] = json.loads(item["explanation"]) if item.get("explanation") else []
+    except (TypeError, ValueError):
+        item["explanation"] = []
+
+    return item
+
+
+def get_latest_scores():
+    """Dernier score enregistre de chaque prospect : {contact_id: {...}}."""
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT
+            scores.*,
+            datetime(scores.calculated_at, 'localtime') AS calculated_at_local
+        FROM scores
+
+        WHERE scores.id = (
+            SELECT max(s.id) FROM scores s WHERE s.contact_id = scores.contact_id
+        )
+        """
+    ).fetchall()
+
+    connection.close()
+
+    return {row["contact_id"]: _score_row(row) for row in rows}
+
+
+def get_score_history(contact_id):
+    """Historique des scores d'un prospect, du plus ancien au plus recent."""
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT
+            *,
+            datetime(calculated_at, 'localtime') AS calculated_at_local
+        FROM scores
+        WHERE contact_id = ?
+        ORDER BY id
+        """,
+        (contact_id,)
+    ).fetchall()
+
+    connection.close()
+
+    return [_score_row(row) for row in rows]
+
+
+def save_score(contact_id, fit, engagement, intent, global_score, explanation):
+    """Ajoute un point a l'historique SEULEMENT si un score a change.
+
+    Concept : on n'ecrit pas une ligne a chaque affichage de la page.
+    L'historique ne contient donc que de vraies variations.
+    Retourne True si une nouvelle ligne a ete enregistree.
+    """
+
+    connection = get_connection()
+
+    try:
+        last = connection.execute(
+            """
+            SELECT fit_score, engagement_score, intent_score, global_score
+            FROM scores WHERE contact_id = ?
+            ORDER BY id DESC LIMIT 1
+            """,
+            (contact_id,)
+        ).fetchone()
+
+        if last and tuple(last) == (fit, engagement, intent, global_score):
+            return False
+
+        connection.execute(
+            """
+            INSERT INTO scores (
+                contact_id, fit_score, engagement_score, intent_score,
+                global_score, explanation
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                contact_id, fit, engagement, intent, global_score,
+                json.dumps(explanation, ensure_ascii=False)
+            )
+        )
+
+        connection.commit()
+
+        return True
 
     finally:
         connection.close()

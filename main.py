@@ -61,6 +61,21 @@ from core.prospect_service import (
     import_prospects
 )
 
+from database import (
+    QUALIFICATION_FIELDS,
+    update_qualification,
+    get_score_history
+)
+
+from core.scoring import DEFAULT_CONFIG
+from core.score_service import (
+    load_config,
+    save_config,
+    refresh_scores,
+    score_changes,
+    calibration_by_stage
+)
+
 # ==========================================
 # 1. CONFIGURATION
 # ==========================================
@@ -77,6 +92,10 @@ prospects = get_all_prospects()
 
 # Etapes du pipeline (personnalisables) : servent aussi de liste de statuts
 stage_names = get_stage_names()
+
+# Scores recalcules a chaque affichage (rapide) ; seules les VARIATIONS
+# sont ajoutees a l'historique en base.
+scores = refresh_scores()
 
 # ==========================================
 # 2. IDENTITE VISUELLE
@@ -132,12 +151,13 @@ page = st.sidebar.radio(
         "Activity",
         "Objections",
         "AI Copilot",
-        "Performance"
+        "Performance",
+        "Settings"
     ]
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.6.0")
+st.sidebar.caption("VERSION 0.7.0")
 
 
 # ==========================================
@@ -308,6 +328,20 @@ def _move_prospect(contact_id, widget_key):
     st.session_state["flash"] = message if ok else f"Error: {message}"
 
 
+TEMPERATURE_COLORS = {"Hot": "red", "Warm": "orange", "Cold": "blue"}
+
+
+def score_label(result):
+    """Libelle colore du score, ex. ":red[72 · Hot]" (syntaxe de couleur Streamlit)."""
+
+    if not result:
+        return "No score"
+
+    color = TEMPERATURE_COLORS[result["temperature"]]
+
+    return f":{color}[{result['global']} · {result['temperature']}]"
+
+
 def pipeline_card(prospect, summary, stale_days):
     """Carte d'un prospect dans le tableau Kanban."""
 
@@ -315,6 +349,7 @@ def pipeline_card(prospect, summary, stale_days):
 
         st.markdown(f"**{prospect['first_name']} {prospect['last_name']}**")
         st.caption(f"{prospect['company_name']} · {prospect['vertical'] or '—'}")
+        st.caption(score_label(scores.get(prospect["id"])))
 
         if summary.get("next_task_title"):
             due = summary["next_task_due"] or ""
@@ -396,7 +431,7 @@ if page == "Overview":
         for p in prospects
     )
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     col1.metric("Total prospects", len(prospects))
     col2.metric("Interactions", interactions_count)
@@ -405,6 +440,9 @@ if page == "Overview":
         p["company_name"] for p in prospects
         if p["company_name"]
     )))
+    col5.metric("Hot prospects", sum(
+        1 for result in scores.values() if result["temperature"] == "Hot"
+    ))
 
     st.divider()
     st.subheader("Your prospecting database")
@@ -507,9 +545,13 @@ elif page == "Prospects":
                 ]:
                     df[column] = df["id"].map(lambda i, k=key: summary.get(i, {}).get(k))
 
+                df["Score"] = df["id"].map(lambda i: scores[i]["global"] if i in scores else None)
+                df["Temperature"] = df["id"].map(lambda i: scores[i]["temperature"] if i in scores else None)
+
                 st.dataframe(
                     df[[
                         "Prospect", "company_name", "vertical", "job_title",
+                        "Score", "Temperature",
                         "email", "phone", "status", "Calls", "Emails",
                         "Last activity", "Next follow-up", "source", "owner"
                     ]].rename(columns={
@@ -720,6 +762,106 @@ elif page == "Prospect Details":
 
             st.divider()
 
+            # SCORE
+
+            st.subheader("Score")
+
+            result = scores.get(contact_id)
+
+            if result:
+
+                col1, col2, col3, col4 = st.columns(4)
+
+                col1.metric("Global score", result["global"])
+                col2.metric("Fit", result["fit"] if result["fit"] is not None else "n/a")
+                col3.metric("Engagement", result["engagement"])
+                col4.metric("Intent", result["intent"])
+
+                st.markdown(score_label(result))
+
+                with st.expander("Why this score?"):
+
+                    st.caption(
+                        "Observed = seen in recorded interactions · Confirmed = entered by you · "
+                        "Rule = scoring rule applied. Nothing is inferred by AI."
+                    )
+
+                    st.dataframe(
+                        pd.DataFrame([
+                            {
+                                "Dimension": item["dimension"].capitalize(),
+                                "Signal": item["signal"],
+                                "Points": item["points"],
+                                "Type": item["type"].capitalize(),
+                            }
+                            for item in result["explanation"]
+                        ]),
+                        width="stretch",
+                        hide_index=True
+                    )
+
+                history = score_changes(get_score_history(contact_id))
+
+                with st.expander(f"Score history ({len(history)} change(s))"):
+
+                    if len(history) > 1:
+                        st.line_chart(
+                            pd.DataFrame([
+                                {
+                                    "Date": row["calculated_at_local"],
+                                    "Global": row["global_score"],
+                                    "Engagement": row["engagement_score"],
+                                    "Intent": row["intent_score"],
+                                }
+                                for row in history
+                            ]).set_index("Date")
+                        )
+
+                    st.dataframe(
+                        pd.DataFrame([
+                            {
+                                "Date": row["calculated_at_local"],
+                                "Global": row["global_score"],
+                                "Change": row["delta"],
+                                "Fit": row["fit_score"],
+                                "Engagement": row["engagement_score"],
+                                "Intent": row["intent_score"],
+                            }
+                            for row in reversed(history)
+                        ]),
+                        width="stretch",
+                        hide_index=True
+                    )
+
+            # QUALIFICATION (informations confirmees par le commercial)
+
+            with st.form(f"qualification_form_{contact_id}"):
+
+                st.markdown("**Qualification**")
+                st.caption(
+                    "Tick only what the prospect has explicitly confirmed. "
+                    "These facts feed the Intent score."
+                )
+
+                labels = {
+                    "need_identified": "Need identified",
+                    "is_decision_maker": "Decision maker",
+                    "budget_confirmed": "Budget confirmed",
+                    "demo_requested": "Demo requested",
+                }
+
+                values = {}
+
+                for column, field in zip(st.columns(len(QUALIFICATION_FIELDS)), QUALIFICATION_FIELDS):
+                    values[field] = column.checkbox(labels[field], value=bool(prospect.get(field)))
+
+                if st.form_submit_button("Save qualification", width="stretch"):
+                    update_qualification(contact_id, values)
+                    st.session_state["flash"] = "Qualification saved. Score updated."
+                    st.rerun()
+
+            st.divider()
+
             # ACTIVITY COUNTERS (calcules automatiquement)
 
             counts = count_by_channel(interactions)
@@ -893,6 +1035,13 @@ elif page == "Prospecting Pipeline":
     only_stale = col_toggles.toggle("Only inactive", key="pipeline_only_stale")
     show_closed = col_toggles.toggle("Show closed stages", key="pipeline_show_closed")
 
+    col_score, col_temperature, _ = st.columns([2, 2, 2])
+
+    min_score = col_score.slider("Minimum score", 0, 100, 0, key="pipeline_min_score")
+    selected_temperatures = col_temperature.multiselect(
+        "Temperature", ["Hot", "Warm", "Cold"], key="pipeline_temperatures"
+    )
+
     filtered = filter_prospects(
         prospects, query, selected_verticals, None, None, selected_owners
     )
@@ -901,6 +1050,12 @@ elif page == "Prospecting Pipeline":
         filtered = [
             p for p in filtered if is_stale(summaries.get(p["id"]), stale_days)
         ]
+
+    filtered = [
+        p for p in filtered
+        if scores[p["id"]]["global"] >= min_score
+        and (not selected_temperatures or scores[p["id"]]["temperature"] in selected_temperatures)
+    ]
 
     tab_board, tab_priorities, tab_stages = st.tabs(
         ["Board", "Priorities", "Stages"], key="pipeline_tabs"
@@ -941,18 +1096,23 @@ elif page == "Prospecting Pipeline":
     with tab_priorities:
 
         st.caption(
-            "Provisional rules until the scoring engine (phase 5): overdue follow-up +3, "
-            "follow-up due today +2, never contacted +1, inactive +1. "
-            "Closed stages are excluded. Ties go to the most advanced stage."
+            "Urgency rules: overdue follow-up +3, follow-up due today +2, "
+            "never contacted +1, inactive +1. Closed stages are excluded. "
+            "Ties go to the highest score, then to the most advanced stage."
         )
 
-        ranked = prioritize(filtered, stages, summaries, stale_days)
+        ranked = prioritize(
+            filtered, stages, summaries, stale_days,
+            scores={pid: result["global"] for pid, result in scores.items()}
+        )
 
         if ranked:
             st.dataframe(
                 pd.DataFrame([
                     {
                         "Priority": item["points"],
+                        "Score": scores[item["prospect"]["id"]]["global"],
+                        "Temperature": scores[item["prospect"]["id"]]["temperature"],
                         "Prospect": f"{item['prospect']['first_name']} {item['prospect']['last_name']}",
                         "Company": item["prospect"]["company_name"],
                         "Stage": item["prospect"]["status"],
@@ -1195,3 +1355,118 @@ elif page == "AI Copilot":
 elif page == "Performance":
     st.title("Performance Analytics")
     st.info("Performance analytics are coming next.")
+
+# ==========================================
+# 8. SETTINGS
+# ==========================================
+
+elif page == "Settings":
+
+    st.title("Settings")
+    st.caption("Scoring configuration. All values are provisional and should be calibrated.")
+
+    show_flash_message()
+
+    config = load_config()
+
+    with st.form("scoring_settings_form"):
+
+        st.subheader("Target profile (Fit score)")
+        st.caption(
+            "Leave a criterion empty to ignore it. With no criterion, Fit is not evaluated "
+            "and the global score uses Engagement and Intent only."
+        )
+
+        col1, col2 = st.columns(2)
+
+        target_verticals = col1.multiselect(
+            "Target verticals",
+            sorted(set(get_verticals()) | set(config["icp"]["verticals"])),
+            default=config["icp"]["verticals"],
+            accept_new_options=True
+        )
+        title_keywords = col2.text_input(
+            "Target job title keywords (comma separated)",
+            value=", ".join(config["icp"]["title_keywords"]),
+            placeholder="Example: sales, ceo, head, vp"
+        )
+
+        st.subheader("Weights (%)")
+
+        col1, col2, col3 = st.columns(3)
+
+        weight_fit = col1.number_input("Fit", 0, 100, round(config["weights"]["fit"] * 100))
+        weight_engagement = col2.number_input(
+            "Engagement", 0, 100, round(config["weights"]["engagement"] * 100)
+        )
+        weight_intent = col3.number_input("Intent", 0, 100, round(config["weights"]["intent"] * 100))
+
+        st.subheader("Thresholds and freshness")
+
+        col1, col2, col3 = st.columns(3)
+
+        hot = col1.number_input("Hot from", 1, 100, config["thresholds"]["hot"])
+        warm = col2.number_input("Warm from", 1, 100, config["thresholds"]["warm"])
+        half_life = col3.number_input(
+            "Signal half-life (days)", 1, 365, config["half_life_days"],
+            help="A signal this old counts for half its points; twice as old, a quarter."
+        )
+
+        col_save, col_reset = st.columns(2)
+
+        submitted = col_save.form_submit_button("Save and recompute", type="primary", width="stretch")
+        reset = col_reset.form_submit_button("Restore defaults", width="stretch")
+
+    if submitted or reset:
+
+        if reset:
+            new_config = DEFAULT_CONFIG
+        else:
+            new_config = {
+                "icp": {
+                    "verticals": target_verticals,
+                    "title_keywords": [k.strip() for k in title_keywords.split(",") if k.strip()],
+                },
+                "weights": {
+                    "fit": weight_fit / 100,
+                    "engagement": weight_engagement / 100,
+                    "intent": weight_intent / 100,
+                },
+                "thresholds": {"hot": hot, "warm": warm},
+                "half_life_days": half_life,
+            }
+
+        ok, message = save_config(new_config)
+
+        if ok:
+            st.session_state["flash"] = message
+            st.rerun()
+        else:
+            st.error(message)
+
+    st.divider()
+
+    st.subheader("Calibration")
+    st.caption(
+        "Average score per pipeline stage. Advanced stages (meetings…) should score higher "
+        "than early ones; if not, adjust the target profile or the weights. "
+        "Reliable calibration needs real conversions over time."
+    )
+
+    st.dataframe(
+        pd.DataFrame(calibration_by_stage(prospects, scores, get_stages())),
+        width="stretch",
+        hide_index=True
+    )
+
+    with st.expander("Scoring rules (points)"):
+        st.markdown(
+            "- **Engagement** (observed, decayed by freshness, capped per type): "
+            "email reply 20 (max 40), inbound call 25 (max 50), LinkedIn reply 15 (max 30), "
+            "phone conversation 15 (max 45), positive response +20 (max 40). "
+            "Outbound attempts without reaction: 0 by design.\n"
+            "- **Intent**: need identified 25, decision maker 15, budget confirmed 30, "
+            "demo requested 30 (confirmed by you), meeting booked 35 (observed, decayed). "
+            "Closed stage: 0.\n"
+            "- **Fit**: target vertical 50, target job title 50 (only configured criteria count)."
+        )
