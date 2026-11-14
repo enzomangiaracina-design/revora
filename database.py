@@ -168,6 +168,23 @@ def initialize_database():
 
     _seed_pipeline_stages(cursor)
 
+    # JOURNAL DES SYNCHRONISATIONS (une ligne par execution d'un connecteur)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS integration_syncs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            finished_at TEXT,
+            status TEXT,
+            fetched INTEGER DEFAULT 0,
+            created INTEGER DEFAULT 0,
+            duplicates INTEGER DEFAULT 0,
+            unmatched INTEGER DEFAULT 0,
+            errors INTEGER DEFAULT 0,
+            message TEXT
+        )
+    """)
+
     # REGLAGES (ex. configuration du scoring), stockes en JSON par cle
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS settings (
@@ -300,12 +317,13 @@ def create_prospect(
     job_title,
     status=None,
     source=None,
-    owner=None
+    owner=None,
+    hubspot_id=None
 ):
     """Cree une entreprise si necessaire et un prospect.
 
-    status, source et owner sont optionnels : les appels existants
-    (7 arguments) continuent de fonctionner.
+    status, source, owner et hubspot_id sont optionnels : les appels
+    existants (7 arguments) continuent de fonctionner.
     """
 
     connection = get_connection()
@@ -343,9 +361,10 @@ def create_prospect(
                 job_title,
                 status,
                 source,
-                owner
+                owner,
+                hubspot_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 company_id,
@@ -356,7 +375,8 @@ def create_prospect(
                 _clean(job_title),
                 _clean(status) or "A prospecter",
                 _clean(source),
-                _clean(owner)
+                _clean(owner),
+                _clean(hubspot_id)
             )
         )
 
@@ -393,6 +413,7 @@ def get_all_prospects():
             contacts.status,
             contacts.source,
             contacts.owner,
+            contacts.hubspot_id,
             contacts.created_at,
             contacts.need_identified,
             contacts.is_decision_maker,
@@ -1016,6 +1037,164 @@ def save_score(contact_id, fit, engagement, intent, global_score, explanation):
 
     finally:
         connection.close()
+
+
+# ==========================================
+# 5 quinquies. INTEGRATIONS ET SYNCHRONISATIONS
+# ==========================================
+
+def add_external_interaction(
+    contact_id,
+    provider,
+    external_id,
+    channel,
+    direction,
+    event_type,
+    occurred_at_utc,
+    subject=None,
+    content=None,
+    metadata=None
+):
+    """Enregistre une interaction venant d'un outil externe (HubSpot, Gmail...).
+
+    occurred_at_utc : "AAAA-MM-JJ HH:MM:SS" en UTC.
+
+    Concept : "idempotence". Recevoir deux fois le meme evenement ne doit
+    pas creer deux lignes. La contrainte UNIQUE(provider, external_id) de la
+    table interactions, combinee a INSERT OR IGNORE, garantit qu'une
+    synchronisation relancee n'ajoute jamais de doublon.
+
+    Retourne True si une ligne a ete ajoutee, False si elle existait deja.
+    """
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute(
+            """
+            INSERT OR IGNORE INTO interactions (
+                contact_id, channel, direction, event_type, subject, content,
+                outcome, occurred_at, provider, external_id, metadata
+            )
+            VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
+            """,
+            (
+                contact_id, channel, direction, event_type, subject, content,
+                occurred_at_utc, provider, external_id,
+                json.dumps(metadata, ensure_ascii=False) if metadata else None
+            )
+        )
+
+        connection.commit()
+
+        return cursor.rowcount == 1
+
+    finally:
+        connection.close()
+
+
+def set_hubspot_id(contact_id, hubspot_id):
+    """Rattache un prospect REVORA a son identifiant HubSpot."""
+
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            "UPDATE contacts SET hubspot_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (hubspot_id, contact_id)
+        )
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def set_integration_status(provider, status, last_error=None, synced=False):
+    """Met a jour l'etat d'une integration (creee si besoin)."""
+
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            """
+            INSERT INTO integrations (provider, status, last_error, last_sync_at)
+            VALUES (?, ?, ?, CASE WHEN ? THEN CURRENT_TIMESTAMP END)
+            ON CONFLICT(provider) DO UPDATE SET
+                status = excluded.status,
+                last_error = excluded.last_error,
+                last_sync_at = CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE last_sync_at END
+            """,
+            (provider, status, last_error, int(synced), int(synced))
+        )
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def get_integrations():
+    """Etat des integrations : {provider: {...}} (heures locales)."""
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT provider, status, last_error,
+               datetime(last_sync_at, 'localtime') AS last_sync_at
+        FROM integrations
+        """
+    ).fetchall()
+
+    connection.close()
+
+    return {row["provider"]: dict(row) for row in rows}
+
+
+def log_sync(provider, status, counts, message=None):
+    """Ajoute une ligne au journal des synchronisations."""
+
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            """
+            INSERT INTO integration_syncs (
+                provider, finished_at, status, fetched, created,
+                duplicates, unmatched, errors, message
+            )
+            VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                provider, status,
+                counts.get("fetched", 0), counts.get("created", 0),
+                counts.get("duplicates", 0), counts.get("unmatched", 0),
+                counts.get("errors", 0), message
+            )
+        )
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def get_sync_logs(limit=20):
+    """Dernieres synchronisations, de la plus recente a la plus ancienne."""
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT *, datetime(started_at, 'localtime') AS started_at_local
+        FROM integration_syncs
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        (limit,)
+    ).fetchall()
+
+    connection.close()
+
+    return [dict(row) for row in rows]
 
 
 # ==========================================

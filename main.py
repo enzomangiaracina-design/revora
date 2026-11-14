@@ -76,6 +76,12 @@ from core.score_service import (
     calibration_by_stage
 )
 
+from database import get_integrations, get_sync_logs
+from core.sync_service import run_sync, import_hubspot_contacts
+from integrations.config import get_secret
+from integrations.hubspot.connector import HubSpotConnector
+from integrations.gmail.connector import GmailConnector
+
 # ==========================================
 # 1. CONFIGURATION
 # ==========================================
@@ -157,7 +163,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.7.0")
+st.sidebar.caption("VERSION 0.8.0")
 
 
 # ==========================================
@@ -1470,3 +1476,82 @@ elif page == "Settings":
             "Closed stage: 0.\n"
             "- **Fit**: target vertical 50, target job title 50 (only configured criteria count)."
         )
+
+    # ---------- INTEGRATIONS ----------
+
+    st.divider()
+    st.subheader("Integrations")
+    st.caption(
+        "Nothing is connected by default. Use TEST accounts only, and set the access tokens "
+        "in the .env file (never in the code). Buttons stay disabled until a token is detected. "
+        "See docs/INTEGRATIONS.md."
+    )
+
+    integration_states = get_integrations()
+
+    for provider, label, secret, connector_class in [
+        ("hubspot", "HubSpot", "HUBSPOT_ACCESS_TOKEN", HubSpotConnector),
+        ("gmail", "Gmail", "GMAIL_ACCESS_TOKEN", GmailConnector),
+    ]:
+        state = integration_states.get(provider, {})
+        has_token = get_secret(secret) is not None
+
+        with st.container(border=True):
+
+            col_name, col_state, col_actions = st.columns([1.5, 2.5, 2], vertical_alignment="center")
+
+            col_name.markdown(f"**{label}**")
+            col_name.caption(state.get("status") or "Not connected")
+
+            col_state.caption(f"Token ({secret}): {'detected' if has_token else 'not set'}")
+            col_state.caption(f"Last sync: {state.get('last_sync_at') or 'never'}")
+
+            if state.get("last_error"):
+                col_state.caption(f":red[{state['last_error']}]")
+
+            if col_actions.button(
+                "Sync now", key=f"sync_{provider}", disabled=not has_token, width="stretch"
+            ):
+                result = run_sync(connector_class())
+                st.session_state["flash"] = (
+                    f"{label}: {result['status']} — {result['created']} created, "
+                    f"{result['duplicates']} duplicate(s), {result['unmatched']} unmatched"
+                    + (f" — {result['message']}" if result.get("message") else "")
+                )
+                st.rerun()
+
+            if provider == "hubspot" and col_actions.button(
+                "Import contacts", key="import_hubspot", disabled=not has_token, width="stretch"
+            ):
+                try:
+                    report = import_hubspot_contacts(HubSpotConnector())
+                    st.session_state["flash"] = (
+                        f"HubSpot contacts: {report['created']} created, {report['linked']} linked, "
+                        f"{report['already_linked']} already linked, {len(report['errors'])} rejected"
+                    )
+                except Exception as error:  # message affiché, jamais de plantage de la page
+                    st.session_state["flash"] = f"HubSpot import failed: {error}"
+                st.rerun()
+
+    logs = get_sync_logs()
+
+    if logs:
+        with st.expander(f"Sync log ({len(logs)})"):
+            st.dataframe(
+                pd.DataFrame([
+                    {
+                        "Date": log["started_at_local"],
+                        "Provider": log["provider"],
+                        "Status": log["status"],
+                        "Fetched": log["fetched"],
+                        "Created": log["created"],
+                        "Duplicates": log["duplicates"],
+                        "Unmatched": log["unmatched"],
+                        "Errors": log["errors"],
+                        "Message": log["message"],
+                    }
+                    for log in logs
+                ]),
+                width="stretch",
+                hide_index=True
+            )

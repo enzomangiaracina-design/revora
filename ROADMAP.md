@@ -46,8 +46,14 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ✅ Aide à la calibration (score moyen par étape)
 - ⬜ Plus tard : calibration sur de vraies conversions, signaux IA, synchronisation des scores vers HubSpot (phase 6)
 
-## Phase 6 — HubSpot et Gmail ⬜
-OAuth, contacts, emails entrants/sortants, activités, webhooks, déduplication, synchronisation contrôlée.
+## Phase 6 — HubSpot et Gmail 🟡
+- ✅ Vérification des API dans la documentation officielle (`docs/INTEGRATIONS.md`)
+- ✅ Connecteurs HubSpot (appels, emails, contacts) et Gmail (en-têtes) — hors ligne, testés avec données fictives
+- ✅ Rattachement aux contacts, déduplication (y compris Gmail ↔ HubSpot), journal, synchronisation incrémentale
+- ⬜ Comptes de **test** créés par l'utilisateur, puis validation sur de vraies réponses d'API
+- ⬜ Flux OAuth complet (obtention et renouvellement des jetons)
+- ⬜ Webhooks HubSpot (serveur FastAPI)
+- ⬜ Écriture contrôlée des scores vers HubSpot (après validation)
 
 ## Phase 7 — Noota ⬜
 Vérification des API réellement disponibles, appels, transcriptions, rapprochement contacts, analyse IA.

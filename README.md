@@ -6,7 +6,7 @@ REVORA est un espace de travail de prospection pour SDR/BDR : il mémorise les
 interactions (appels, emails, notes), organise le portefeuille de prospects et
 aide à décider quelle action effectuer ensuite.
 
-Statut : **prototype local** (Streamlit + SQLite), version 0.7.0.
+Statut : **prototype local** (Streamlit + SQLite), version 0.8.0.
 
 ## Lancer l'application
 
@@ -55,8 +55,9 @@ Les tests utilisent une base temporaire : ils ne touchent jamais `revora.db`.
 | `backups/` | Copies horodatées des fichiers et de la base, faites avant chaque modification importante |
 | `requirements.txt` | Liste des bibliothèques Python nécessaires |
 | `pytest.ini` | Configuration des tests |
-| `core/` | Logique métier : `prospect_service.py` (validation, doublons, filtres, import CSV), `scoring.py` (moteur de scoring Fit / Engagement / Intent), `score_service.py` (configuration, historique, calibration), `deduplication.py` (normalisation email/téléphone), `activity_service.py` (interactions, relances, périodes), `pipeline_service.py` (Kanban, inactivité, priorités) |
-| `integrations/` | `base.py` (interface commune des connecteurs) et dossiers HubSpot, Gmail, Noota, LinkedIn (non implémentés) |
+| `core/` | Logique métier : `prospect_service.py` (validation, doublons, filtres, import CSV), `scoring.py` (moteur de scoring Fit / Engagement / Intent), `score_service.py` (configuration, historique, calibration), `deduplication.py` (normalisation email/téléphone), `activity_service.py` (interactions, relances, périodes), `pipeline_service.py` (Kanban, inactivité, priorités), `sync_service.py` (synchronisation, rattachement, déduplication) |
+| `integrations/` | `base.py` (interface commune), `http.py` (client HTTP avec retries), `config.py` (secrets .env), connecteurs `hubspot/` et `gmail/` (hors ligne, voir `docs/INTEGRATIONS.md`) ; `noota/`, `linkedin/` réservés |
+| `docs/` | Documentation technique (`INTEGRATIONS.md` : API vérifiées, points à confirmer, étapes de connexion) |
 | `ai/` | Copilot, analyse d'appels, détection d'objections (réservés, aucun modèle connecté) |
 | `tests/` | Tests automatiques pytest |
 | `CLAUDE.md` | Règles du projet pour l'assistant IA |
@@ -87,7 +88,7 @@ git add -A && git commit -m "Description de la modification"
 | Prospect Details | Fonctionnel : coordonnées, compteurs, dernière interaction, prochaine action, saisie d'interactions, timeline, relances |
 | Activity | Fonctionnel : indicateurs du jour, timeline globale filtrable, relances par échéance, saisie rapide |
 | Prospecting Pipeline | Fonctionnel : Kanban, étapes personnalisables, filtres, inactivité, vue priorisée |
-| Settings | Fonctionnel : configuration du scoring (profil cible, pondérations, seuils, demi-vie), calibration |
+| Settings | Fonctionnel : configuration du scoring, calibration, état des intégrations (non connectées) |
 | Objections, AI Copilot, Performance | Pages vides (à venir) |
 
 ## Base de données

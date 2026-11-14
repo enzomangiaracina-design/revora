@@ -1,5 +1,46 @@
 # CHANGELOG — REVORA
 
+## [0.8.0] — 2026-11-14 — Phase 6 (partie hors ligne) : connecteurs HubSpot et Gmail
+
+**Aucun compte externe n'est connecté.** Connecteurs écrits d'après la documentation officielle
+(vérifiée le 14/11/2026) et testés uniquement avec des données fictives. Voir `docs/INTEGRATIONS.md`.
+
+### Ajouté
+- `integrations/http.py` : client HTTP sans dépendance (urllib), retries sur 429 / 5xx,
+  respect de `Retry-After`, transport remplaçable dans les tests.
+- `integrations/config.py` : lecture des secrets depuis `.env` sans écraser les variables du terminal.
+- `integrations/hubspot/connector.py` : recherche paginée et incrémentale (hs_lastmodifieddate) des
+  appels et emails, contacts associés, normalisation (sens, durée en ms, résultats d'appel par GUID
+  documentés), import des contacts. Contenu des emails / notes d'appel non importé par défaut.
+- `integrations/gmail/connector.py` : scope minimal `gmail.metadata` (en-têtes uniquement),
+  synchronisation complète puis partielle par l'historique, retour à la complète si l'historique a
+  expiré (404), brouillons / spam / corbeille ignorés, sens déterminé par l'expéditeur.
+- `core/sync_service.py` : rattachement aux contacts (identifiant CRM, puis téléphone unique, puis
+  email ; une clé ambiguë passe à la suivante), déduplication (identifiant externe ; même email vu par
+  Gmail et HubSpot), journal, mémoire de la dernière synchronisation, import des contacts HubSpot
+  (un contact sans entreprise est rejeté plutôt que complété par supposition).
+- Base : table `integration_syncs` ; `add_external_interaction` (INSERT OR IGNORE, idempotent),
+  `set_hubspot_id`, état des intégrations ; `create_prospect` accepte `hubspot_id`.
+- Settings → **Integrations** : état, jeton détecté ou non, dernière synchronisation, boutons
+  « Sync now » / « Import contacts » désactivés tant qu'aucun jeton n'est configuré, journal.
+- `.env.example` : variables HubSpot et Gmail commentées. `docs/INTEGRATIONS.md`.
+- 27 nouveaux tests (140 au total).
+
+### Constats importants de la documentation
+- Gmail : toutes les autorisations de lecture sont **restreintes** (vérification Google, audit de
+  sécurité si stockage serveur) ; `q` interdit avec `gmail.metadata`.
+- HubSpot : aucune propriété `Message-ID` documentée pour les emails → rapprochement Gmail/HubSpot
+  par contact + sens + objet + fenêtre de 3 minutes.
+
+### Tests effectués
+- `python3 -m pytest` : 140 tests réussis, aucun appel réseau ; `revora.db` inchangée.
+- Interface sur une copie : toutes les pages ; Settings → Integrations, boutons désactivés sans jeton.
+- Sauvegarde préalable : `backups/20261114-232841/`. Migration : table `integration_syncs`.
+
+### À confirmer sur des comptes de test
+- Réponse de la lecture groupée des associations HubSpot ; version d'API (v3 ou datée).
+- Unité d'`internalDate` Gmail et forme des enregistrements d'historique.
+
 ## [0.7.0] — 2026-11-14 — Phase 5 : Scoring
 
 ### Ajouté

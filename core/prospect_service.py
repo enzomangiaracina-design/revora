@@ -159,6 +159,7 @@ def create_prospect(data):
         status=data.get("status"),
         source=data.get("source"),
         owner=data.get("owner"),
+        hubspot_id=data.get("hubspot_id"),
     )
 
 
