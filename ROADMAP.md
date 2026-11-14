@@ -11,8 +11,15 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ✅ Git initialisé (`.gitignore`, `.env.example`)
 - ✅ Structure `core/`, `integrations/`, `ai/`, `tests/`, `requirements.txt`
 
-## Phase 2 — Prospect Management ⬜
-Création, modification, suppression avec confirmation, import CSV, recherche et filtres, entreprises et verticales.
+## Phase 2 — Prospect Management ✅
+- ✅ Création avec validation et détection des doublons
+- ✅ Modification des fiches
+- ✅ Suppression avec confirmation
+- ✅ Import CSV (rapport détaillé)
+- ✅ Recherche et filtres (verticale, statut, source)
+- ✅ Verticales personnalisables (choisir ou saisir)
+- ⬜ Plus tard : édition des infos entreprise (site, taille, pays), filtre par commercial (phase 4),
+  synchronisation CRM (phase 6)
 
 ## Phase 3 — Activity Manager 🟡
 - ✅ Saisie manuelle d'appels, emails et notes

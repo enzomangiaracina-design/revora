@@ -74,3 +74,106 @@ def test_task_lifecycle(thomas):
 
     database.complete_task(task["id"])
     assert database.get_tasks(thomas)[0]["status"] == "Terminee"
+
+
+# ---------- Phase 2 : migration, modification, suppression ----------
+
+OLD_SCHEMA = """
+CREATE TABLE companies (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+    vertical TEXT, website TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER,
+    first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT, phone TEXT,
+    job_title TEXT, status TEXT DEFAULT 'A prospecter', hubspot_id TEXT UNIQUE,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO companies (name, vertical) VALUES ('AlphaEngine', 'SaaS');
+INSERT INTO contacts (company_id, first_name, last_name, email)
+    VALUES (1, 'Thomas', 'Martins', 'thomas.martin@example.com');
+"""
+
+
+def test_migration_adds_columns_and_keeps_data(tmp_path, monkeypatch):
+    """Une base au format de la version 0.3 doit être migrée sans perte."""
+
+    old_db = tmp_path / "old.db"
+    connection = sqlite3.connect(old_db)
+    connection.executescript(OLD_SCHEMA)
+    connection.close()
+
+    monkeypatch.setattr(database, "DATABASE_PATH", old_db)
+    database.initialize_database()
+    database.initialize_database()  # une deuxième fois : rien ne doit casser
+
+    connection = sqlite3.connect(old_db)
+    contact_columns = {row[1] for row in connection.execute("PRAGMA table_info(contacts)")}
+    company_columns = {row[1] for row in connection.execute("PRAGMA table_info(companies)")}
+    connection.close()
+
+    assert {"source", "owner", "updated_at"} <= contact_columns
+    assert {"industry", "size", "country"} <= company_columns
+
+    prospect = database.get_all_prospects()[0]
+    assert prospect["first_name"] == "Thomas"
+    assert prospect["company_name"] == "AlphaEngine"
+    assert prospect["source"] is None
+
+
+def test_update_prospect(thomas):
+    ok, _ = database.update_prospect(
+        thomas, "Thomas", "Martin", "AlphaEngine", "SaaS",
+        "thomas.martin@example.com", "0612345678", "VP Sales", "En contact",
+        source="Salon", owner="Enzo",
+    )
+
+    prospect = database.get_prospect_by_id(thomas)
+    assert ok
+    assert prospect["last_name"] == "Martin"
+    assert prospect["job_title"] == "VP Sales"
+    assert prospect["status"] == "En contact"
+    assert prospect["source"] == "Salon"
+    assert prospect["updated_at"] is not None
+
+
+def test_update_rejects_email_of_another_contact(thomas):
+    database.create_prospect("Julie", "Durand", "Beta", "SaaS", "julie@example.com", None, None)
+
+    ok, message = database.update_prospect(
+        thomas, "Thomas", "Martins", "AlphaEngine", "SaaS",
+        "JULIE@example.com", None, None, "A prospecter",
+    )
+
+    assert not ok
+    assert database.get_prospect_by_id(thomas)["email"] == "thomas.martin@example.com"
+
+
+def test_update_can_move_to_new_company(thomas):
+    database.update_prospect(
+        thomas, "Thomas", "Martins", "NewCo", "Finance", None, None, None, "A prospecter"
+    )
+
+    prospect = database.get_prospect_by_id(thomas)
+    assert prospect["company_name"] == "NewCo"
+    assert prospect["vertical"] == "Finance"
+    assert database.get_verticals() == ["Finance", "SaaS"]
+
+
+def test_delete_prospect_removes_linked_data(thomas):
+    database.add_interaction(thomas, "Call", "Outbound", "No answer", "", "x", "")
+    database.create_task(thomas, "Rappeler", "", "2026-11-18")
+
+    assert database.count_prospect_activity(thomas) == {"interactions": 1, "tasks": 1, "scores": 0}
+
+    deleted = database.delete_prospect(thomas)
+
+    assert deleted == {"interactions": 1, "tasks": 1, "scores": 0, "contacts": 1}
+    assert database.get_prospect_by_id(thomas) is None
+    assert database.get_interactions(thomas) == []
+    assert database.get_verticals() == ["SaaS"]  # l'entreprise est conservée
+
+
+def test_empty_vertical_does_not_duplicate_company(temp_db):
+    database.create_prospect("A", "One", "Gamma", None, None, None, None)
+    database.create_prospect("B", "Two", "Gamma", "", None, None, None)
+
+    connection = sqlite3.connect(temp_db)
+    assert connection.execute("SELECT count(*) FROM companies").fetchone()[0] == 1
+    connection.close()

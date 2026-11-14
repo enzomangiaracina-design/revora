@@ -127,6 +127,15 @@ def initialize_database():
         )
     """)
 
+    # MIGRATIONS (phase 2) : ajout de colonnes sur une base existante,
+    # sans toucher aux données déjà enregistrées.
+    _add_column_if_missing(cursor, "contacts", "source", "TEXT")
+    _add_column_if_missing(cursor, "contacts", "owner", "TEXT")
+    _add_column_if_missing(cursor, "contacts", "updated_at", "TEXT")
+    _add_column_if_missing(cursor, "companies", "industry", "TEXT")
+    _add_column_if_missing(cursor, "companies", "size", "TEXT")
+    _add_column_if_missing(cursor, "companies", "country", "TEXT")
+
     connection.commit()
     connection.close()
 
@@ -134,9 +143,66 @@ def initialize_database():
     print(f"Database location: {DATABASE_PATH}")
 
 
+def _add_column_if_missing(cursor, table, column, column_type):
+    """Ajoute une colonne a une table si elle n'existe pas encore.
+
+    Concept : c'est une "migration". SQLite ne modifie pas une table deja
+    creee avec CREATE TABLE IF NOT EXISTS ; on ajoute donc les nouvelles
+    colonnes une par une avec ALTER TABLE. Les lignes existantes recoivent
+    la valeur NULL dans la nouvelle colonne : aucune donnee n'est perdue.
+    """
+
+    columns = [row["name"] for row in cursor.execute(f"PRAGMA table_info({table})")]
+
+    if column not in columns:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
+
+
 # ==========================================
 # 3. CREATION DES PROSPECTS
 # ==========================================
+
+def _clean(value):
+    """Retire les espaces autour d'un texte ; retourne None si le texte est vide."""
+
+    if value is None:
+        return None
+
+    value = str(value).strip()
+
+    return value or None
+
+
+def _get_or_create_company(cursor, company_name, vertical):
+    """Retourne l'id de l'entreprise (meme nom et meme verticale), en la creant si besoin."""
+
+    vertical = _clean(vertical)
+
+    # "IS" (et non "=") pour que deux verticales vides (NULL) soient considerees egales
+    cursor.execute(
+        """
+        SELECT id FROM companies
+        WHERE lower(name) = lower(?)
+        AND vertical IS ?
+        """,
+        (company_name.strip(), vertical)
+    )
+
+    company = cursor.fetchone()
+
+    if company:
+        return company["id"]
+
+    cursor.execute(
+        """
+        INSERT INTO companies (name, vertical)
+        VALUES (?, ?)
+        """,
+        (company_name.strip(), vertical)
+    )
+
+    return cursor.lastrowid
+
 
 def create_prospect(
     first_name,
@@ -145,41 +211,23 @@ def create_prospect(
     vertical,
     email,
     phone,
-    job_title
+    job_title,
+    status=None,
+    source=None,
+    owner=None
 ):
-    """Cree une entreprise si necessaire et un prospect."""
+    """Cree une entreprise si necessaire et un prospect.
+
+    status, source et owner sont optionnels : les appels existants
+    (7 arguments) continuent de fonctionner.
+    """
 
     connection = get_connection()
 
     try:
         cursor = connection.cursor()
 
-        # Recherche de l'entreprise
-        cursor.execute(
-            """
-            SELECT id FROM companies
-            WHERE lower(name) = lower(?)
-            AND vertical = ?
-            """,
-            (company_name.strip(), vertical)
-        )
-
-        company = cursor.fetchone()
-
-        # Creation de l'entreprise si elle n'existe pas
-        if company:
-            company_id = company["id"]
-
-        else:
-            cursor.execute(
-                """
-                INSERT INTO companies (name, vertical)
-                VALUES (?, ?)
-                """,
-                (company_name.strip(), vertical)
-            )
-
-            company_id = cursor.lastrowid
+        company_id = _get_or_create_company(cursor, company_name, vertical)
 
         # Verification de l'email
         if email and email.strip():
@@ -206,17 +254,23 @@ def create_prospect(
                 last_name,
                 email,
                 phone,
-                job_title
+                job_title,
+                status,
+                source,
+                owner
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 company_id,
                 first_name.strip(),
                 last_name.strip(),
-                email.strip() if email else None,
-                phone.strip() if phone else None,
-                job_title.strip() if job_title else None
+                _clean(email),
+                _clean(phone),
+                _clean(job_title),
+                _clean(status) or "A prospecter",
+                _clean(source),
+                _clean(owner)
             )
         )
 
@@ -251,6 +305,8 @@ def get_all_prospects():
             contacts.phone,
             contacts.job_title,
             contacts.status,
+            contacts.source,
+            contacts.owner,
             contacts.created_at,
             companies.name AS company_name,
             companies.vertical
@@ -266,6 +322,25 @@ def get_all_prospects():
     connection.close()
 
     return [dict(prospect) for prospect in prospects]
+
+
+def get_verticals():
+    """Liste des verticales deja utilisees, triees par ordre alphabetique."""
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT DISTINCT vertical
+        FROM companies
+        WHERE vertical IS NOT NULL AND vertical != ''
+        ORDER BY vertical
+        """
+    ).fetchall()
+
+    connection.close()
+
+    return [row["vertical"] for row in rows]
 
 
 # ==========================================
@@ -296,6 +371,146 @@ def get_prospect_by_id(contact_id):
     connection.close()
 
     return dict(prospect) if prospect else None
+
+
+# ==========================================
+# 5 bis. MODIFICATION ET SUPPRESSION
+# ==========================================
+
+def update_prospect(
+    contact_id,
+    first_name,
+    last_name,
+    company_name,
+    vertical,
+    email,
+    phone,
+    job_title,
+    status,
+    source=None,
+    owner=None
+):
+    """Met a jour un prospect. Retourne (succes, message)."""
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        # L'email ne doit pas appartenir a un AUTRE contact
+        if _clean(email):
+            cursor.execute(
+                """
+                SELECT id FROM contacts
+                WHERE lower(email) = lower(?) AND id != ?
+                """,
+                (email.strip(), contact_id)
+            )
+
+            if cursor.fetchone():
+                return False, "Cet email existe deja dans REVORA."
+
+        company_id = _get_or_create_company(cursor, company_name, vertical)
+
+        cursor.execute(
+            """
+            UPDATE contacts
+            SET company_id = ?,
+                first_name = ?,
+                last_name = ?,
+                email = ?,
+                phone = ?,
+                job_title = ?,
+                status = ?,
+                source = ?,
+                owner = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                company_id,
+                first_name.strip(),
+                last_name.strip(),
+                _clean(email),
+                _clean(phone),
+                _clean(job_title),
+                _clean(status) or "A prospecter",
+                _clean(source),
+                _clean(owner),
+                contact_id
+            )
+        )
+
+        if cursor.rowcount == 0:
+            return False, "Prospect introuvable."
+
+        connection.commit()
+
+        return True, "Prospect mis a jour."
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def count_prospect_activity(contact_id):
+    """Compte ce qui est rattache a un prospect (affiche avant une suppression)."""
+
+    connection = get_connection()
+
+    counts = {
+        table: connection.execute(
+            f"SELECT count(*) FROM {table} WHERE contact_id = ?",
+            (contact_id,)
+        ).fetchone()[0]
+        for table in ("interactions", "tasks", "scores")
+    }
+
+    connection.close()
+
+    return counts
+
+
+def delete_prospect(contact_id):
+    """Supprime DEFINITIVEMENT un prospect et tout ce qui lui est rattache.
+
+    Concept : une "transaction". Les quatre suppressions sont validees
+    ensemble par commit(), ou annulees ensemble par rollback() en cas
+    d'erreur : on ne peut pas se retrouver avec des interactions orphelines.
+    L'entreprise est conservee (d'autres contacts peuvent y etre rattaches).
+
+    Retourne le nombre d'elements supprimes par table.
+    """
+
+    connection = get_connection()
+
+    try:
+        deleted = {}
+
+        for table in ("interactions", "tasks", "scores"):
+            deleted[table] = connection.execute(
+                f"DELETE FROM {table} WHERE contact_id = ?",
+                (contact_id,)
+            ).rowcount
+
+        deleted["contacts"] = connection.execute(
+            "DELETE FROM contacts WHERE id = ?",
+            (contact_id,)
+        ).rowcount
+
+        connection.commit()
+
+        return deleted
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
 
 
 # ==========================================

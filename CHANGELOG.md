@@ -1,5 +1,37 @@
 # CHANGELOG — REVORA
 
+## [0.4.0] — 2026-11-14 — Phase 2 : gestion des prospects
+
+### Ajouté
+- Page **Prospects** réorganisée en 3 onglets (l'onglet ouvert est mémorisé) :
+  - **Database** : recherche (nom, entreprise, email, poste, téléphone), filtres verticale / statut / source,
+    modification d'un prospect, suppression avec case de confirmation et décompte des éléments supprimés.
+  - **New prospect** : création avec validation, verticale existante ou nouvelle.
+  - **Import CSV** : modèle téléchargeable, séparateurs `,` ou `;`, encodages UTF-8 / Latin-1, en-têtes
+    français et HubSpot reconnus, aperçu, rapport (créés / doublons ignorés / lignes rejetées avec raison).
+- `database.py` : `update_prospect`, `delete_prospect` (transaction : interactions, relances et scores
+  supprimés avec le contact ; l'entreprise est conservée), `count_prospect_activity`, `get_verticals`.
+  `create_prospect` accepte en plus `status`, `source`, `owner` (rétrocompatible).
+- `core/prospect_service.py` : statuts du pipeline, validation (email, téléphone, statut), détection des
+  doublons (même email, ou même prénom + nom + entreprise ; le téléphone seul ne bloque pas), filtres, import CSV.
+- 29 nouveaux tests (48 au total).
+
+### Migration de la base
+- Nouvelles colonnes, ajoutées automatiquement au lancement sans perte de données :
+  `contacts.source`, `contacts.owner`, `contacts.updated_at`, `companies.industry`, `companies.size`, `companies.country`.
+- Sauvegarde préalable : `backups/20261114-225551/`.
+
+### Corrigé
+- Une entreprise sans verticale était recréée à chaque nouveau contact (`vertical = NULL` ne correspond
+  jamais en SQL) : la recherche utilise désormais `IS`.
+
+### Tests effectués
+- `python3 -m pytest` : 48 tests réussis ; `revora.db` inchangée (empreinte MD5 identique).
+- Interface testée sur une copie de la base : création, doublon refusé, filtre, modification,
+  suppression (bouton désactivé tant que la case n'est pas cochée).
+- Navigateur, sur une copie du projet : création avec nouvelle verticale « Santé », import d'un CSV
+  `;` avec accents (1 créé, 1 doublon, 1 rejeté), onglet conservé après dépôt du fichier.
+
 ## [0.3.2] — 2026-11-14
 
 ### Ajouté
