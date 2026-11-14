@@ -1,5 +1,40 @@
 # CHANGELOG — REVORA
 
+## [0.9.0] — 2026-11-14 — Branding (avant la phase 8)
+
+Application de l'identité visuelle du brand kit (`REVORA_Brand_Kit/REVORA_Direction_Artistique.pdf`).
+Phases 6 (HubSpot / Gmail, partie en ligne) et 7 (Noota) mises en pause à la demande.
+
+### Ajouté
+- `.streamlit/config.toml` : thème centralisé — palette officielle (Lavande #A78BFA, Violet #7C3AED,
+  Nuit #0B0B12, Ardoise #1A1A24, Gris #6B7280, Blanc cassé #F8FAFC), police **Inter**
+  (Regular / Medium / SemiBold), rayons 8 px, couleurs des graphiques, barre latérale.
+- `ui/theme.py` : jetons de design (couleurs, grille 4 px, rayons 8 / 12 px), logo, signature,
+  styles des cartes KPI (Ardoise, rayon 12 px, valeur en blanc) et navigation latérale
+  (élément actif en violet, sans rond de sélection), icônes de navigation.
+- `assets/brand/` : logo horizontal, logo avec descripteur, monogramme, favicon — découpés des PNG
+  du brand kit, fond rendu transparent.
+- Logo dans la barre latérale (monogramme quand elle est repliée), descripteur
+  « Sales Execution Platform », favicon, titre d'onglet, signature sur l'Overview.
+
+### Modifié
+- `main.py` : l'ancien bloc CSS (couleurs approximatives) est remplacé par `theme.apply_theme()`.
+  La valeur des KPI passe de lavande à blanc : le violet est réservé aux actions et à la sélection.
+
+### Écarts assumés par rapport à la charte
+- **Logo raster provisoire** : le brand kit précise que le monogramme définitif doit être redessiné
+  en SVG. Les PNG d'`assets/brand/` sont à remplacer par ces exports.
+- **Icônes** : la charte prévoit Lucide ; Streamlit n'intègre que Material Symbols. Une seule
+  famille est utilisée (Material, style linéaire) pour ne pas mélanger les styles.
+- **Police** chargée depuis Google Fonts par le navigateur (pas de fichier embarqué).
+
+### Tests effectués
+- `python3 -m pytest` : 140 tests réussis ; `revora.db` inchangée.
+- Les 9 pages s'affichent sans erreur (sur une copie de la base).
+- Navigateur (1440 px) : Overview, Pipeline, fiche prospect, Activity ; navigation active,
+  barre latérale repliée (monogramme).
+- Sauvegarde préalable : `backups/20261114-234054/`. Aucune migration de base.
+
 ## [0.8.0] — 2026-11-14 — Phase 6 (partie hors ligne) : connecteurs HubSpot et Gmail
 
 **Aucun compte externe n'est connecté.** Connecteurs écrits d'après la documentation officielle

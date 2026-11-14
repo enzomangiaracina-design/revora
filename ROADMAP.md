@@ -46,7 +46,12 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ✅ Aide à la calibration (score moyen par étape)
 - ⬜ Plus tard : calibration sur de vraies conversions, signaux IA, synchronisation des scores vers HubSpot (phase 6)
 
-## Phase 6 — HubSpot et Gmail 🟡
+## Branding ✅ (inséré avant la phase 8)
+- ✅ Thème centralisé : palette officielle, police Inter, rayons, cartes KPI, navigation
+- ✅ Logo, monogramme, favicon (raster provisoires issus du brand kit)
+- ⬜ Logo vectoriel SVG définitif (à fournir), icônes Lucide (nécessite une interface hors Streamlit)
+
+## Phase 6 — HubSpot et Gmail ⏸ (en pause)
 - ✅ Vérification des API dans la documentation officielle (`docs/INTEGRATIONS.md`)
 - ✅ Connecteurs HubSpot (appels, emails, contacts) et Gmail (en-têtes) — hors ligne, testés avec données fictives
 - ✅ Rattachement aux contacts, déduplication (y compris Gmail ↔ HubSpot), journal, synchronisation incrémentale
@@ -55,7 +60,7 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ⬜ Webhooks HubSpot (serveur FastAPI)
 - ⬜ Écriture contrôlée des scores vers HubSpot (après validation)
 
-## Phase 7 — Noota ⬜
+## Phase 7 — Noota ⏸ (en pause)
 Vérification des API réellement disponibles, appels, transcriptions, rapprochement contacts, analyse IA.
 
 ## Phase 8 — Objection Intelligence ⬜

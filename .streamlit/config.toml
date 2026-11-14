@@ -1,0 +1,43 @@
+# Thème REVORA — source : REVORA_Brand_Kit / REVORA_Direction_Artistique.pdf
+# Les couleurs, la typographie et les rayons sont CENTRALISÉS ici et dans ui/theme.py.
+# Ne pas introduire de couleur, de rayon ou d'effet arbitraire ailleurs.
+
+[theme]
+base = "dark"
+
+# Palette officielle
+primaryColor = "#7C3AED"             # Violet : actions principales, navigation active, sélection
+backgroundColor = "#0B0B12"          # Nuit : fond principal
+secondaryBackgroundColor = "#1A1A24" # Ardoise : surfaces (champs, cartes)
+textColor = "#F8FAFC"                # Blanc cassé : texte principal
+linkColor = "#A78BFA"                # Lavande
+linkUnderline = false
+borderColor = "#262633"              # bordure discrète
+showWidgetBorder = true
+dataframeBorderColor = "#262633"
+dataframeHeaderBackgroundColor = "#1A1A24"
+dataframeHeaderTextColor = "#9CA3AF"
+
+# Couleurs sémantiques (réservées aux états : succès, attention, erreur, information)
+violetColor = "#A78BFA"
+grayColor = "#6B7280"
+
+# Typographie : Inter (Regular texte, Medium labels, SemiBold titres et KPI)
+# Chargée depuis Google Fonts par le navigateur.
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, sans-serif"
+headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, sans-serif"
+headingFontWeights = 600
+baseFontWeight = 400
+metricValueFontWeight = 600
+
+# Rayons : 8 px pour les contrôles (12 px pour les cartes, voir ui/theme.py)
+baseRadius = "8px"
+buttonRadius = "8px"
+
+# Graphiques : violet / lavande d'abord, puis neutres
+chartCategoricalColors = ["#A78BFA", "#7C3AED", "#6B7280", "#C4B5FD", "#4C1D95", "#9CA3AF"]
+
+[theme.sidebar]
+backgroundColor = "#0F0F18"
+secondaryBackgroundColor = "#1A1A24"
+borderColor = "#1F1F2B"

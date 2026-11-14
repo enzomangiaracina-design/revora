@@ -24,6 +24,7 @@
 - Mettre à jour `CHANGELOG.md` à chaque modification, `ROADMAP.md` quand une phase avance, `README.md` si le lancement ou la structure change.
 
 ## Architecture
+- Identité visuelle : couleurs, police et rayons dans `.streamlit/config.toml` ; jetons et CSS complémentaire dans `ui/theme.py`. Ne jamais ajouter de couleur, rayon, effet ou style d'icône ailleurs (règle du brand kit). Le violet est réservé aux actions, à la navigation active et à la sélection ; vert/orange/rouge/bleu aux états.
 - `database.py` : toute la logique SQL. `main.py` n'exécute jamais de SQL directement.
 - `DATABASE_PATH` est relatif à `database.py` (pas au dossier courant).
 - Interactions : `UNIQUE(provider, external_id)` garantit l'idempotence des synchronisations futures ; les saisies manuelles utilisent `provider = 'manual'`.

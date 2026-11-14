@@ -4,6 +4,8 @@ from datetime import date, datetime
 import streamlit as st
 import pandas as pd
 
+from ui import theme
+
 from database import (
     initialize_database,
     get_all_prospects,
@@ -87,8 +89,8 @@ from integrations.gmail.connector import GmailConnector
 # ==========================================
 
 st.set_page_config(
-    page_title="REVORA | Sales Workspace",
-    page_icon="⚡",
+    page_title="REVORA | Sales Execution Platform",
+    page_icon=str(theme.FAVICON),
     layout="wide"
 )
 
@@ -107,48 +109,16 @@ scores = refresh_scores()
 # 2. IDENTITE VISUELLE
 # ==========================================
 
-st.markdown("""
-<style>
-    .stApp {
-        background-color: #10131D;
-        color: #F5F5F7;
-    }
-
-    [data-testid="stSidebar"] {
-        background-color: #171B29;
-    }
-
-    h1, h2, h3 {
-        color: #FFFFFF !important;
-    }
-
-    div[data-testid="stMetric"] {
-        background-color: #202536;
-        padding: 18px;
-        border-radius: 12px;
-        border: 1px solid #303447;
-    }
-
-    div[data-testid="stMetricValue"] {
-        color: #B9A7FF;
-    }
-
-    div[data-testid="stMetricLabel"] {
-        color: #AEB3C2;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Couleurs, police et rayons : .streamlit/config.toml
+# Logo, cartes KPI et navigation : ui/theme.py
+theme.apply_theme()
 
 # ==========================================
 # 3. NAVIGATION
 # ==========================================
 
-st.sidebar.markdown("# REVORA")
-st.sidebar.caption("SALES WORKSPACE")
-st.sidebar.divider()
-
 page = st.sidebar.radio(
-    "NAVIGATION",
+    "Navigation",
     [
         "Overview",
         "Prospecting Pipeline",
@@ -159,11 +129,13 @@ page = st.sidebar.radio(
         "AI Copilot",
         "Performance",
         "Settings"
-    ]
+    ],
+    format_func=theme.nav_label,
+    label_visibility="collapsed"
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.8.0")
+st.sidebar.caption("VERSION 0.9.0")
 
 
 # ==========================================
@@ -420,7 +392,7 @@ def follow_up_card(task, show_prospect=True):
 if page == "Overview":
 
     st.title("Good morning.")
-    st.caption("Here is your prospecting overview.")
+    st.caption(theme.SIGNATURE)
 
     st.divider()
 
