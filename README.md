@@ -31,7 +31,19 @@ python3 database.py
 ## Prérequis
 
 - Python 3 (testé avec 3.15.2)
-- Streamlit (testé avec 1.67.0), Pandas (testé avec 3.1.1)
+- Dépendances listées dans `requirements.txt` :
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+## Lancer les tests
+
+```bash
+python3 -m pytest
+```
+
+Les tests utilisent une base temporaire : ils ne touchent jamais `revora.db`.
 
 ## Structure
 
@@ -41,6 +53,12 @@ python3 database.py
 | `database.py` | Accès à la base SQLite : création des tables et toutes les fonctions de lecture/écriture |
 | `revora.db` | Base SQLite locale. **Ne jamais la supprimer.** |
 | `backups/` | Copies horodatées des fichiers et de la base, faites avant chaque modification importante |
+| `requirements.txt` | Liste des bibliothèques Python nécessaires |
+| `pytest.ini` | Configuration des tests |
+| `core/` | Logique métier : `scoring.py` (score global), `deduplication.py` (normalisation email/téléphone), services prospects/activités (réservés) |
+| `integrations/` | `base.py` (interface commune des connecteurs) et dossiers HubSpot, Gmail, Noota, LinkedIn (non implémentés) |
+| `ai/` | Copilot, analyse d'appels, détection d'objections (réservés, aucun modèle connecté) |
+| `tests/` | Tests automatiques pytest |
 | `CLAUDE.md` | Règles du projet pour l'assistant IA |
 | `ROADMAP.md` | Phases de développement |
 | `CHANGELOG.md` | Historique des modifications |

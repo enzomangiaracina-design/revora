@@ -18,3 +18,4 @@ venv/
 # Fichiers système / éditeur
 .DS_Store
 .vscode/
+.pytest_cache/

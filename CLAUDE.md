@@ -31,6 +31,14 @@
 - Scoring prévu : global = 0,35 × Fit + 0,40 × Engagement + 0,25 × Intent (pondérations configurables, scores sur 100).
 
 ## Tester
+Tests automatiques (base temporaire via la fixture `temp_db` de `tests/conftest.py`) :
+
+```bash
+python3 -m pytest
+```
+
+Tout nouveau code dans `core/` doit avoir ses tests dans `tests/`.
+
 Rendu de toutes les pages sans navigateur (sur une copie de la base) :
 
 ```python

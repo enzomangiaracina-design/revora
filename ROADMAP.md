@@ -2,14 +2,14 @@
 
 Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 
-## Phase 1 — Stabilisation 🟡
+## Phase 1 — Stabilisation ✅
 - ✅ Audit du projet
 - ✅ Correction de l'erreur d'import `get_prospect_by_id`
 - ✅ Vérification SQLite (intégrité OK, données de démonstration présentes)
 - ✅ Stabilisation du lancement (toutes les pages s'affichent sans erreur)
-- ⬜ Tests automatisés de persistance (pytest)
+- ✅ Tests automatisés de persistance (pytest, 19 tests)
 - ✅ Git initialisé (`.gitignore`, `.env.example`)
-- ⬜ Organisation des fichiers (dossiers `app/`, `tests/`…)
+- ✅ Structure `core/`, `integrations/`, `ai/`, `tests/`, `requirements.txt`
 
 ## Phase 2 — Prospect Management ⬜
 Création, modification, suppression avec confirmation, import CSV, recherche et filtres, entreprises et verticales.
