@@ -1,5 +1,31 @@
 # CHANGELOG — REVORA
 
+## [0.12.0] — 2026-11-15 — Page Performance (module H)
+
+### Ajouté
+- Page **Performance** : période 7 / 30 / 90 jours, comparaison avec la période précédente
+  (écart en valeur ou en points), cartes KPI simples conformes à la charte.
+  - **Activité** : appels effectués, appels par jour ouvré, taux de connexion, emails envoyés,
+    emails par jour ouvré.
+  - **Résultats** : taux de réponse, rendez-vous obtenus, taux de conversion, objections,
+    délai moyen entre deux relances.
+  - Activité quotidienne (appels, emails envoyés, réponses), tableau **par verticale**.
+  - Définitions de chaque indicateur affichées dans la page.
+- `core/performance_service.py` : calculs purs et documentés. Un taux sans dénominateur affiche
+  « — » plutôt qu'un 0 % trompeur. Jours ouvrés = lundi à vendredi.
+- 10 nouveaux tests (189 au total), valeurs vérifiées à la main.
+
+### Non disponible
+- Performance par séquence : REVORA n'a pas encore de séquences (prévu avec la connexion HubSpot).
+- Vues manager et équipe : prévues avec la gestion des utilisateurs (phase 11).
+
+### Tests effectués
+- `python3 -m pytest` : 189 tests réussis ; `revora.db` inchangée.
+- Les 9 pages s'affichent sans erreur (sur une copie).
+- Navigateur sur une copie avec un mois d'activité fictive : indicateurs, écarts colorés dans le bon
+  sens (un délai de relance qui augmente est en rouge), graphique quotidien, tableau par verticale.
+- Sauvegarde préalable : `backups/20261115-000621/`. Aucune migration de base.
+
 ## [0.11.0] — 2026-11-15 — Phase 8 : Objection Intelligence (saisie manuelle)
 
 Règle appliquée : **aucune objection n'est inventée**. Seules les objections saisies par le

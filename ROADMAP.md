@@ -70,6 +70,10 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ Playbook de réponses recommandées, exemples anonymisés
 - ✅ Préparation d'appel dans la fiche prospect
 - ⬜ Détection et catégorisation automatiques par IA (après Noota / AI Copilot), toujours à confirmer
+## Module H — Performance ✅ (avant la phase 9)
+- ✅ Indicateurs individuels, comparaison de périodes, activité quotidienne, par verticale
+- ⬜ Par séquence (avec HubSpot), vues manager / équipe (phase 11)
+
 ## Phase 9 — LinkedIn (API officielles uniquement) ⬜
 ## Phase 10 — AI Copilot ⬜
 ## Phase 11 — Multi-utilisateur ⬜

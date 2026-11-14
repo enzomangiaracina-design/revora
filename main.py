@@ -106,6 +106,16 @@ from core.objection_service import (
     format_day
 )
 
+from core.performance_service import (
+    PERIODS as PERFORMANCE_PERIODS,
+    period_range,
+    previous_range,
+    compute_kpis,
+    delta,
+    daily_activity,
+    by_vertical
+)
+
 from database import get_integrations, get_sync_logs
 from core.sync_service import run_sync, import_hubspot_contacts
 from integrations.config import get_secret
@@ -164,7 +174,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.11.0")
+st.sidebar.caption("VERSION 0.12.0")
 
 
 # ==========================================
@@ -1699,8 +1709,102 @@ elif page == "AI Copilot":
     st.info("Your AI assistant is coming next.")
 
 elif page == "Performance":
-    st.title("Performance Analytics")
-    st.info("Performance analytics are coming next.")
+
+    col_title, col_period = st.columns([3, 2], vertical_alignment="bottom")
+
+    col_title.title("Performance")
+    period_label = col_period.segmented_control(
+        "Period", list(PERFORMANCE_PERIODS), default="Last 30 days",
+        key="performance_period", label_visibility="collapsed",
+    ) or "Last 30 days"
+
+    start, end = period_range(PERFORMANCE_PERIODS[period_label])
+    previous_start, previous_end = previous_range(start, end)
+
+    st.caption(
+        f"{start.strftime('%d/%m/%Y')} – {end.strftime('%d/%m/%Y')} · "
+        f"compared with the previous {PERFORMANCE_PERIODS[period_label]} days · "
+        "based only on recorded interactions"
+    )
+
+    all_interactions = get_all_interactions()
+    all_objections = get_objections()
+
+    current = compute_kpis(all_interactions, all_objections, start, end)
+    previous = compute_kpis(all_interactions, all_objections, previous_start, previous_end)
+
+    def kpi(column, label, key, unit="", inverse=False, help_text=None):
+        """Carte KPI : un chiffre, un libellé, la comparaison avec la période précédente."""
+
+        value = current[key]
+        change = delta(value, previous[key])
+
+        column.metric(
+            label,
+            "—" if value is None else f"{value}{unit}",
+            delta=None if not change else f"{change:+g}{' pts' if unit == ' %' else ''}",
+            delta_color="inverse" if inverse else "normal",
+            help=help_text,
+        )
+
+    st.markdown("**Activity**")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    kpi(col1, "Calls made", "calls")
+    kpi(col2, "Calls / working day", "calls_per_day")
+    kpi(col3, "Connection rate", "connection_rate", " %",
+        help_text="Outbound calls that reached a conversation / outbound calls.")
+    kpi(col4, "Emails sent", "emails_sent")
+    kpi(col5, "Emails / working day", "emails_per_day")
+
+    st.markdown("**Results**")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    kpi(col1, "Reply rate", "reply_rate", " %",
+        help_text="Contacted prospects who replied (inbound email, call or LinkedIn) / contacted prospects.")
+    kpi(col2, "Meetings booked", "meetings")
+    kpi(col3, "Conversion rate", "conversion_rate", " %",
+        help_text="Contacted prospects who booked a meeting / contacted prospects.")
+    kpi(col4, "Objections", "objections", inverse=True)
+    kpi(col5, "Days between follow-ups", "follow_up_delay", inverse=True,
+        help_text="Average days between two successive outbound touches on the same prospect.")
+
+    st.caption(
+        f"{current['contacted']} prospect(s) contacted · {current['replied']} replied · "
+        f"{current['emails_received']} email(s) received · {current['working_days']} working day(s)"
+    )
+
+    st.divider()
+
+    st.markdown("**Daily activity**")
+    activity_rows = daily_activity(all_interactions, start, end)
+
+    if any(row["Calls"] or row["Emails sent"] or row["Replies"] for row in activity_rows):
+        st.bar_chart(pd.DataFrame(activity_rows).set_index("Day"), stack=False)
+    else:
+        st.info("No interaction recorded in this period.")
+
+    st.markdown("**By vertical**")
+    vertical_rows = by_vertical(all_interactions, all_objections, prospects, start, end)
+
+    if vertical_rows:
+        st.dataframe(pd.DataFrame(vertical_rows), width="stretch", hide_index=True)
+    else:
+        st.info("No prospect contacted in this period.")
+
+    with st.expander("How are these indicators calculated?"):
+        st.markdown(
+            "- **Calls made**: outbound calls. **Per working day**: divided by Monday–Friday days.\n"
+            "- **Connection rate**: outbound calls with result *Completed, Positive response, Objection, "
+            "Meeting booked* or *Information shared*, divided by outbound calls.\n"
+            "- **Reply rate**: prospects contacted outbound in the period who then sent an inbound "
+            "email, call or LinkedIn message, divided by prospects contacted.\n"
+            "- **Meetings booked**: interactions whose result is *Meeting booked*.\n"
+            "- **Conversion rate**: contacted prospects who booked a meeting in the period.\n"
+            "- **Days between follow-ups**: average gap between two successive outbound touches "
+            "on the same prospect.\n"
+            "- A rate shows **—** when there is nothing to divide (never a misleading 0 %).\n"
+            "- **Performance by sequence** is not available yet: REVORA has no sequences "
+            "(planned with the HubSpot connection)."
+        )
 
 # ==========================================
 # 8. SETTINGS
