@@ -1,4 +1,6 @@
 
+from datetime import date, datetime
+
 import streamlit as st
 import pandas as pd
 
@@ -6,14 +8,29 @@ from database import (
     initialize_database,
     get_all_prospects,
     get_prospect_by_id,
-    add_interaction,
     get_interactions,
     create_task,
     get_tasks,
     complete_task,
     get_verticals,
     count_prospect_activity,
-    delete_prospect
+    delete_prospect,
+    get_all_interactions,
+    get_all_tasks,
+    get_activity_summary
+)
+
+from core.activity_service import (
+    CHANNELS,
+    DIRECTIONS,
+    RESULTS,
+    PERIODS,
+    TASK_OPEN,
+    log_interaction,
+    group_tasks,
+    period_bounds,
+    count_by_channel,
+    format_duration
 )
 
 from core.prospect_service import (
@@ -99,7 +116,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.4.0")
+st.sidebar.caption("VERSION 0.5.0")
 
 
 # ==========================================
@@ -187,6 +204,101 @@ def prospect_form(form_key, verticals, submit_label, defaults=None):
     }
 
     return submitted, data
+
+
+def interaction_form(form_key, prospect_options=None):
+    """Formulaire d'enregistrement d'une interaction.
+
+    prospect_options : {libelle: contact_id}. S'il est fourni, le formulaire
+    propose de choisir le prospect (page Activity) ; sinon le prospect est
+    deja connu (fiche prospect).
+
+    Retourne (bouton_clique, contact_id ou None, donnees_saisies).
+    """
+
+    with st.form(form_key, clear_on_submit=True):
+
+        contact_label = None
+
+        if prospect_options:
+            contact_label = st.selectbox("Prospect", list(prospect_options))
+
+        col1, col2, col3 = st.columns(3)
+
+        channel = col1.selectbox("Interaction type", CHANNELS)
+        direction = col2.selectbox("Direction", DIRECTIONS)
+        event_type = col3.selectbox("Result", RESULTS)
+
+        col1, col2, col3 = st.columns(3)
+
+        day = col1.date_input("Date", value="today", max_value=date.today())
+        time = col2.time_input("Time", value="now")
+        duration = col3.number_input(
+            "Call duration (minutes)", min_value=0.0, step=1.0,
+            help="Calls only. Leave 0 if unknown."
+        )
+
+        subject = st.text_input("Subject")
+
+        content = st.text_area(
+            "Notes / interaction details",
+            placeholder="What happened during this interaction?"
+        )
+
+        col1, col2 = st.columns(2)
+
+        outcome = col1.text_input(
+            "Next step",
+            placeholder="Example: Call back next Tuesday"
+        )
+        follow_up_date = col2.date_input(
+            "Follow-up date (optional)", value=None,
+            help="Creates a follow-up task with the next step as title."
+        )
+
+        submitted = st.form_submit_button("Save interaction", width="stretch")
+
+    data = {
+        "channel": channel,
+        "direction": direction,
+        "event_type": event_type,
+        "subject": subject,
+        "content": content,
+        "outcome": outcome,
+        "occurred_at": datetime.combine(day, time),
+        "duration_minutes": duration,
+        "follow_up_date": follow_up_date,
+    }
+
+    contact_id = prospect_options[contact_label] if prospect_options else None
+
+    return submitted, contact_id, data
+
+
+def follow_up_card(task, show_prospect=True):
+    """Affiche une relance avec un bouton pour la marquer comme terminee."""
+
+    with st.container(border=True):
+
+        col_text, col_button = st.columns([4, 1])
+
+        col_text.markdown(f"**{task['title']}**")
+
+        details = [f"Due: {task['due_at'] or 'no date'}"]
+
+        if show_prospect and task.get("first_name"):
+            details.insert(0, f"{task['first_name']} {task['last_name']} — {task['company_name']}")
+
+        col_text.caption(" · ".join(details))
+
+        if task.get("description"):
+            col_text.write(task["description"])
+
+        if task["status"] == TASK_OPEN:
+            if col_button.button("Done", key=f"done_{task['id']}", width="stretch"):
+                complete_task(task["id"])
+                st.session_state["flash"] = f"Follow-up completed: {task['title']}"
+                st.rerun()
 
 # ==========================================
 # 4. OVERVIEW
@@ -306,10 +418,22 @@ elif page == "Prospects":
                 df = pd.DataFrame(filtered)
                 df["Prospect"] = df["first_name"] + " " + df["last_name"]
 
+                # Compteurs automatiques calcules depuis les interactions et relances
+                summary = get_activity_summary()
+
+                for column, key in [
+                    ("Calls", "calls"),
+                    ("Emails", "emails"),
+                    ("Last activity", "last_interaction_at"),
+                    ("Next follow-up", "next_task_due"),
+                ]:
+                    df[column] = df["id"].map(lambda i, k=key: summary.get(i, {}).get(k))
+
                 st.dataframe(
                     df[[
                         "Prospect", "company_name", "vertical", "job_title",
-                        "email", "phone", "status", "source", "owner"
+                        "email", "phone", "status", "Calls", "Emails",
+                        "Last activity", "Next follow-up", "source", "owner"
                     ]].rename(columns={
                         "company_name": "Company",
                         "vertical": "Vertical",
@@ -461,6 +585,8 @@ elif page == "Prospect Details":
     st.title("Prospect Details")
     st.caption("Your complete commercial memory.")
 
+    show_flash_message()
+
     if not prospects:
         st.info("Add a prospect before opening a prospect file.")
 
@@ -516,28 +642,31 @@ elif page == "Prospect Details":
 
             st.divider()
 
-            # ACTIVITY COUNTERS
+            # ACTIVITY COUNTERS (calcules automatiquement)
 
-            calls_count = sum(
-                1 for item in interactions
-                if item["channel"] == "Call"
+            counts = count_by_channel(interactions)
+            summary = get_activity_summary().get(contact_id, {})
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            col1.metric("Calls", counts["Call"])
+            col2.metric("Emails", counts["Email"])
+            col3.metric("LinkedIn", counts["LinkedIn"])
+            col4.metric("Notes", counts["Note"])
+
+            col1, col2 = st.columns(2)
+
+            col1.metric(
+                "Last interaction",
+                summary.get("last_interaction_at") or "None yet"
             )
-
-            emails_count = sum(
-                1 for item in interactions
-                if item["channel"] == "Email"
+            col2.metric(
+                "Next action",
+                (
+                    f"{summary['next_task_due'] or 'no date'} · {summary['next_task_title']}"
+                    if summary.get("next_task_title") else "None scheduled"
+                )
             )
-
-            notes_count = sum(
-                1 for item in interactions
-                if item["channel"] == "Note"
-            )
-
-            col1, col2, col3 = st.columns(3)
-
-            col1.metric("Calls", calls_count)
-            col2.metric("Emails", emails_count)
-            col3.metric("Notes", notes_count)
 
             st.divider()
 
@@ -545,67 +674,16 @@ elif page == "Prospect Details":
 
             st.subheader("Record an interaction")
 
-            with st.form("interaction_form"):
+            submitted, _, data = interaction_form(f"interaction_form_{contact_id}")
 
-                channel = st.selectbox(
-                    "Interaction type",
-                    ["Call", "Email", "Note"]
-                )
+            if submitted:
+                ok, message = log_interaction(contact_id, data)
 
-                direction = st.selectbox(
-                    "Direction",
-                    ["Outbound", "Inbound", "Internal"]
-                )
-
-                event_type = st.selectbox(
-                    "Result",
-                    [
-                        "Completed",
-                        "No answer",
-                        "Voicemail",
-                        "Positive response",
-                        "Objection",
-                        "Meeting booked",
-                        "Information shared",
-                        "Other"
-                    ]
-                )
-
-                subject = st.text_input("Subject")
-
-                content = st.text_area(
-                    "Notes / interaction details",
-                    placeholder="What happened during this interaction?"
-                )
-
-                outcome = st.text_input(
-                    "Next step or outcome",
-                    placeholder="Example: Call back next Tuesday"
-                )
-
-                save_interaction = st.form_submit_button(
-                    "Save interaction",
-                    width="stretch"
-                )
-
-                if save_interaction:
-
-                    if not content.strip() and not subject.strip():
-                        st.error("Enter a subject or interaction note.")
-
-                    else:
-                        add_interaction(
-                            contact_id,
-                            channel,
-                            direction,
-                            event_type,
-                            subject,
-                            content,
-                            outcome
-                        )
-
-                        st.success("Interaction saved.")
-                        st.rerun()
+                if ok:
+                    st.session_state["flash"] = message
+                    st.rerun()
+                else:
+                    st.error(message)
 
             st.divider()
 
@@ -623,10 +701,13 @@ elif page == "Prospect Details":
                             f"**{item['channel']} · {item['event_type']}**"
                         )
 
-                        st.caption(
-                            f"{item['occurred_at']} · "
-                            f"{item['direction'] or 'Not specified'}"
-                        )
+                        details = [
+                            item["occurred_at_local"],
+                            item["direction"] or "Not specified",
+                            format_duration(item["metadata"]),
+                        ]
+
+                        st.caption(" · ".join(d for d in details if d))
 
                         if item["subject"]:
                             st.write(f"**{item['subject']}**")
@@ -679,38 +760,25 @@ elif page == "Prospect Details":
                             due_date.isoformat()
                         )
 
-                        st.success("Follow-up scheduled.")
+                        st.session_state["flash"] = "Follow-up scheduled."
                         st.rerun()
 
-            tasks = get_tasks(contact_id)
+            groups = group_tasks(get_tasks(contact_id))
+            open_tasks = groups["overdue"] + groups["today"] + groups["upcoming"] + groups["no_date"]
 
-            if tasks:
+            if groups["overdue"]:
+                st.warning(f"{len(groups['overdue'])} overdue follow-up(s).")
 
-                for task in tasks:
+            for task in open_tasks:
+                follow_up_card(task, show_prospect=False)
 
-                    with st.container(border=True):
+            if not open_tasks:
+                st.info("No open follow-ups.")
 
-                        st.markdown(f"**{task['title']}**")
-
-                        st.caption(
-                            f"Due: {task['due_at']} · "
-                            f"Status: {task['status']}"
-                        )
-
-                        if task["description"]:
-                            st.write(task["description"])
-
-                        if task["status"] == "A faire":
-
-                            if st.button(
-                                "Mark as completed",
-                                key=f"complete_{task['id']}"
-                            ):
-                                complete_task(task["id"])
-                                st.rerun()
-
-            else:
-                st.info("No follow-ups scheduled.")
+            if groups["done"]:
+                with st.expander(f"Completed follow-ups ({len(groups['done'])})"):
+                    for task in groups["done"]:
+                        st.caption(f"✓ {task['title']} · due {task['due_at'] or 'no date'}")
 
 # ==========================================
 # 7. OTHER MODULES
@@ -721,8 +789,129 @@ elif page == "Prospecting Pipeline":
     st.info("Pipeline development is coming next.")
 
 elif page == "Activity":
+
     st.title("Activity Manager")
-    st.info("Centralized activity management is coming next.")
+    st.caption("Every call, email, LinkedIn message and note — and what to do next.")
+
+    show_flash_message()
+
+    today_start, today_end = period_bounds("Today")
+    week_start, week_end = period_bounds("Last 7 days")
+
+    today_counts = count_by_channel(get_all_interactions(start_date=today_start, end_date=today_end))
+    week_total = len(get_all_interactions(start_date=week_start, end_date=week_end))
+    task_groups = group_tasks(get_all_tasks())
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    col1.metric("Calls today", today_counts["Call"])
+    col2.metric("Emails today", today_counts["Email"])
+    col3.metric("Interactions (7 days)", week_total)
+    col4.metric("Due today", len(task_groups["today"]))
+    col5.metric("Overdue", len(task_groups["overdue"]))
+
+    tab_timeline, tab_follow_ups, tab_log = st.tabs(
+        ["Timeline", "Follow-ups", "Log activity"],
+        key="activity_tabs"
+    )
+
+    # ---------- TIMELINE GLOBALE ----------
+
+    with tab_timeline:
+
+        col_period, col_channel, col_search = st.columns([1, 2, 2])
+
+        period = col_period.selectbox("Period", PERIODS, index=1)
+        selected_channels = col_channel.multiselect("Type", CHANNELS)
+        search = col_search.text_input("Prospect or company")
+
+        start, end = period_bounds(period)
+        activity = get_all_interactions(selected_channels, start, end)
+
+        if search.strip():
+            needle = search.strip().lower()
+            activity = [
+                item for item in activity
+                if needle in f"{item['first_name']} {item['last_name']} {item['company_name'] or ''}".lower()
+            ]
+
+        st.caption(f"{len(activity)} interaction(s)")
+
+        if activity:
+            st.dataframe(
+                pd.DataFrame([
+                    {
+                        "Date": item["occurred_at_local"],
+                        "Prospect": f"{item['first_name']} {item['last_name']}",
+                        "Company": item["company_name"],
+                        "Type": item["channel"],
+                        "Direction": item["direction"],
+                        "Result": item["event_type"],
+                        "Duration": format_duration(item["metadata"]),
+                        "Subject": item["subject"],
+                        "Notes": item["content"],
+                        "Next step": item["outcome"],
+                    }
+                    for item in activity
+                ]),
+                width="stretch",
+                hide_index=True
+            )
+        else:
+            st.info("No interaction for these filters.")
+
+    # ---------- RELANCES ----------
+
+    with tab_follow_ups:
+
+        sections = [
+            ("overdue", "Overdue"),
+            ("today", "Today"),
+            ("upcoming", "Upcoming"),
+            ("no_date", "No due date"),
+        ]
+
+        if not any(task_groups[key] for key, _ in sections):
+            st.info("No open follow-ups. Schedule one from a prospect file or when logging an activity.")
+
+        for key, label in sections:
+            if task_groups[key]:
+                st.subheader(f"{label} ({len(task_groups[key])})")
+
+                for task in task_groups[key]:
+                    follow_up_card(task)
+
+        if task_groups["done"]:
+            with st.expander(f"Completed ({len(task_groups['done'])})"):
+                for task in task_groups["done"]:
+                    st.caption(
+                        f"✓ {task['title']} · {task['first_name']} {task['last_name']}"
+                        f" · due {task['due_at'] or 'no date'}"
+                    )
+
+    # ---------- SAISIE RAPIDE ----------
+
+    with tab_log:
+
+        if not prospects:
+            st.info("Add a prospect before logging an activity.")
+
+        else:
+            options = {
+                f"{p['first_name']} {p['last_name']} — {p['company_name']}": p["id"]
+                for p in prospects
+            }
+
+            submitted, contact_id, data = interaction_form("log_activity_form", options)
+
+            if submitted:
+                ok, message = log_interaction(contact_id, data)
+
+                if ok:
+                    st.session_state["flash"] = message
+                    st.rerun()
+                else:
+                    st.error(message)
 
 elif page == "Objections":
     st.title("Objection Intelligence")

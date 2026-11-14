@@ -21,12 +21,13 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ⬜ Plus tard : édition des infos entreprise (site, taille, pays), filtre par commercial (phase 4),
   synchronisation CRM (phase 6)
 
-## Phase 3 — Activity Manager 🟡
-- ✅ Saisie manuelle d'appels, emails et notes
-- ✅ Timeline par prospect
-- ✅ Relances (création, validation)
-- ✅ Compteurs par prospect
-- ⬜ Vue Activity globale, prochaines actions du jour
+## Phase 3 — Activity Manager ✅
+- ✅ Saisie manuelle d'appels, emails, LinkedIn et notes (date/heure réelles, durée d'appel)
+- ✅ Timeline par prospect et timeline globale filtrable
+- ✅ Relances : création (aussi depuis une interaction), classement par échéance, validation
+- ✅ Compteurs automatiques (fiche prospect, liste, indicateurs du jour)
+- ✅ Heures affichées en heure locale
+- ⬜ Plus tard : modifier / supprimer une interaction saisie par erreur, synchronisation automatique (phases 6-7)
 
 ## Phase 4 — Pipeline ⬜
 Kanban, étapes personnalisables, filtres, verticales, vue priorisée.

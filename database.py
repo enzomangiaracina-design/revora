@@ -1,4 +1,5 @@
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -524,9 +525,22 @@ def add_interaction(
     event_type,
     subject,
     content,
-    outcome
+    outcome,
+    occurred_at=None,
+    metadata=None
 ):
-    """Enregistre un appel, un email ou une note."""
+    """Enregistre un appel, un email, un message LinkedIn ou une note.
+
+    occurred_at : date et heure LOCALES ("2026-11-14 15:30:00"), optionnelles.
+                  Absentes = maintenant.
+    metadata    : dictionnaire optionnel (ex. {"duration_seconds": 300}),
+                  stocke au format JSON.
+
+    Concept (fuseaux horaires) : la base stocke toutes les heures en UTC,
+    l'heure universelle. C'est ce que fait deja CURRENT_TIMESTAMP. Une heure
+    locale saisie par l'utilisateur est donc convertie en UTC avec
+    datetime(?, 'utc'), puis reconvertie en heure locale a l'affichage.
+    """
 
     connection = get_connection()
 
@@ -541,9 +555,13 @@ def add_interaction(
                 subject,
                 content,
                 outcome,
+                occurred_at,
+                metadata,
                 provider
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?,
+                    COALESCE(datetime(?, 'utc'), CURRENT_TIMESTAMP),
+                    ?, ?)
             """,
             (
                 contact_id,
@@ -553,6 +571,8 @@ def add_interaction(
                 subject,
                 content,
                 outcome,
+                occurred_at,
+                json.dumps(metadata) if metadata else None,
                 "manual"
             )
         )
@@ -576,7 +596,9 @@ def get_interactions(contact_id):
 
     interactions = connection.execute(
         """
-        SELECT *
+        SELECT
+            *,
+            datetime(occurred_at, 'localtime') AS occurred_at_local
         FROM interactions
 
         WHERE contact_id = ?
@@ -588,7 +610,115 @@ def get_interactions(contact_id):
 
     connection.close()
 
-    return [dict(item) for item in interactions]
+    return [_with_metadata(item) for item in interactions]
+
+
+def _with_metadata(row):
+    """Convertit une ligne en dictionnaire et decode la colonne metadata (JSON)."""
+
+    item = dict(row)
+
+    try:
+        item["metadata"] = json.loads(item["metadata"]) if item.get("metadata") else {}
+    except (TypeError, ValueError):
+        item["metadata"] = {}
+
+    return item
+
+
+def get_all_interactions(channels=None, start_date=None, end_date=None):
+    """Toutes les interactions, avec le nom du prospect et de l'entreprise.
+
+    channels   : liste de canaux a garder (None = tous).
+    start_date, end_date : dates LOCALES "AAAA-MM-JJ" incluses (None = sans limite).
+    """
+
+    query = """
+        SELECT
+            interactions.*,
+            datetime(interactions.occurred_at, 'localtime') AS occurred_at_local,
+            contacts.first_name,
+            contacts.last_name,
+            companies.name AS company_name
+        FROM interactions
+
+        JOIN contacts
+            ON interactions.contact_id = contacts.id
+
+        LEFT JOIN companies
+            ON contacts.company_id = companies.id
+
+        WHERE 1 = 1
+    """
+
+    params = []
+
+    if channels:
+        query += f" AND interactions.channel IN ({', '.join('?' for _ in channels)})"
+        params.extend(channels)
+
+    if start_date:
+        query += " AND date(interactions.occurred_at, 'localtime') >= ?"
+        params.append(start_date)
+
+    if end_date:
+        query += " AND date(interactions.occurred_at, 'localtime') <= ?"
+        params.append(end_date)
+
+    query += " ORDER BY interactions.occurred_at DESC, interactions.id DESC"
+
+    connection = get_connection()
+    rows = connection.execute(query, params).fetchall()
+    connection.close()
+
+    return [_with_metadata(row) for row in rows]
+
+
+def get_activity_summary():
+    """Compteurs automatiques par prospect.
+
+    Retourne un dictionnaire {contact_id: {...}} avec le nombre d'appels,
+    d'emails, de messages LinkedIn et de notes, la date de la derniere
+    interaction (heure locale) et la prochaine relance ouverte.
+    """
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT
+            contacts.id AS contact_id,
+
+            (SELECT count(*) FROM interactions i
+             WHERE i.contact_id = contacts.id AND i.channel = 'Call') AS calls,
+
+            (SELECT count(*) FROM interactions i
+             WHERE i.contact_id = contacts.id AND i.channel = 'Email') AS emails,
+
+            (SELECT count(*) FROM interactions i
+             WHERE i.contact_id = contacts.id AND i.channel = 'LinkedIn') AS linkedin,
+
+            (SELECT count(*) FROM interactions i
+             WHERE i.contact_id = contacts.id AND i.channel = 'Note') AS notes,
+
+            (SELECT datetime(max(i.occurred_at), 'localtime') FROM interactions i
+             WHERE i.contact_id = contacts.id) AS last_interaction_at,
+
+            (SELECT t.due_at FROM tasks t
+             WHERE t.contact_id = contacts.id AND t.status = 'A faire'
+             ORDER BY t.due_at IS NULL, t.due_at LIMIT 1) AS next_task_due,
+
+            (SELECT t.title FROM tasks t
+             WHERE t.contact_id = contacts.id AND t.status = 'A faire'
+             ORDER BY t.due_at IS NULL, t.due_at LIMIT 1) AS next_task_title
+
+        FROM contacts
+        """
+    ).fetchall()
+
+    connection.close()
+
+    return {row["contact_id"]: dict(row) for row in rows}
 
 
 # ==========================================
@@ -646,6 +776,35 @@ def get_tasks(contact_id):
         ORDER BY due_at ASC
         """,
         (contact_id,)
+    ).fetchall()
+
+    connection.close()
+
+    return [dict(task) for task in tasks]
+
+
+def get_all_tasks():
+    """Toutes les relances, avec le nom du prospect et de l'entreprise."""
+
+    connection = get_connection()
+
+    tasks = connection.execute(
+        """
+        SELECT
+            tasks.*,
+            contacts.first_name,
+            contacts.last_name,
+            companies.name AS company_name
+        FROM tasks
+
+        JOIN contacts
+            ON tasks.contact_id = contacts.id
+
+        LEFT JOIN companies
+            ON contacts.company_id = companies.id
+
+        ORDER BY tasks.due_at IS NULL, tasks.due_at ASC, tasks.id ASC
+        """
     ).fetchall()
 
     connection.close()

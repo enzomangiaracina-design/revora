@@ -1,5 +1,36 @@
 # CHANGELOG — REVORA
 
+## [0.5.0] — 2026-11-14 — Phase 3 : Activity Manager
+
+### Ajouté
+- Page **Activity** (onglets mémorisés) :
+  - indicateurs : appels et emails du jour, interactions sur 7 jours, relances du jour et en retard ;
+  - **Timeline** globale : filtres période / type / prospect ou entreprise, durée des appels, prochaine étape ;
+  - **Follow-ups** : relances classées En retard / Aujourd'hui / À venir / Sans date, bouton « Done », historique des terminées ;
+  - **Log activity** : saisie rapide d'une interaction pour n'importe quel prospect.
+- Formulaire d'interaction commun (page Activity et fiche prospect) : canal LinkedIn, date et heure réelles
+  de l'interaction, durée d'appel, prochaine étape et **création automatique d'une relance** si une date est choisie.
+- Fiche prospect : compteurs appels / emails / LinkedIn / notes, dernière interaction, prochaine action,
+  relances en retard signalées, relances terminées repliées.
+- Liste des prospects : colonnes Calls, Emails, Last activity, Next follow-up (calculées automatiquement).
+- `database.py` : `get_all_interactions` (filtres canal et dates), `get_all_tasks`, `get_activity_summary` ;
+  `add_interaction` accepte `occurred_at` et `metadata` (rétrocompatible).
+- `core/activity_service.py` : validation (pas d'interaction dans le futur, relance après l'interaction),
+  regroupement des relances, périodes, compteurs, format des durées.
+- 25 nouveaux tests (73 au total).
+
+### Corrigé
+- Les heures étaient affichées en **UTC** (1 h de moins qu'à Paris en hiver). Elles restent stockées en UTC
+  dans la base et sont désormais converties en heure locale à l'affichage et pour les filtres par date.
+- Les messages de confirmation de la fiche prospect disparaissaient immédiatement (effacés par `st.rerun()`).
+
+### Tests effectués
+- `python3 -m pytest` : 73 tests réussis ; `revora.db` inchangée.
+- Interface sur une copie de la base : saisie avec relance, compteurs, timeline (heure locale, durée),
+  refus d'une saisie vide, relance terminée depuis la page Activity, toutes les pages sans erreur.
+- Navigateur sur une copie : page Activity (indicateurs, timeline, relances en retard / à venir).
+- Sauvegarde préalable : `backups/20261114-230744/`. Aucune migration de structure dans cette version.
+
 ## [0.4.0] — 2026-11-14 — Phase 2 : gestion des prospects
 
 ### Ajouté

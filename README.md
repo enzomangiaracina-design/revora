@@ -6,7 +6,7 @@ REVORA est un espace de travail de prospection pour SDR/BDR : il mémorise les
 interactions (appels, emails, notes), organise le portefeuille de prospects et
 aide à décider quelle action effectuer ensuite.
 
-Statut : **prototype local** (Streamlit + SQLite), version 0.4.0.
+Statut : **prototype local** (Streamlit + SQLite), version 0.5.0.
 
 ## Lancer l'application
 
@@ -55,7 +55,7 @@ Les tests utilisent une base temporaire : ils ne touchent jamais `revora.db`.
 | `backups/` | Copies horodatées des fichiers et de la base, faites avant chaque modification importante |
 | `requirements.txt` | Liste des bibliothèques Python nécessaires |
 | `pytest.ini` | Configuration des tests |
-| `core/` | Logique métier : `prospect_service.py` (validation, doublons, filtres, import CSV), `scoring.py` (score global), `deduplication.py` (normalisation email/téléphone), `activity_service.py` (réservé) |
+| `core/` | Logique métier : `prospect_service.py` (validation, doublons, filtres, import CSV), `scoring.py` (score global), `deduplication.py` (normalisation email/téléphone), `activity_service.py` (interactions, relances, périodes) |
 | `integrations/` | `base.py` (interface commune des connecteurs) et dossiers HubSpot, Gmail, Noota, LinkedIn (non implémentés) |
 | `ai/` | Copilot, analyse d'appels, détection d'objections (réservés, aucun modèle connecté) |
 | `tests/` | Tests automatiques pytest |
@@ -84,8 +84,9 @@ git add -A && git commit -m "Description de la modification"
 |---|---|
 | Overview | Fonctionnel (compteurs réels depuis SQLite) |
 | Prospects | Fonctionnel : recherche, filtres, création, modification, suppression confirmée, import CSV |
-| Prospect Details | Fonctionnel : coordonnées, compteurs, ajout d'interactions, timeline, relances |
-| Prospecting Pipeline, Activity, Objections, AI Copilot, Performance | Pages vides (à venir) |
+| Prospect Details | Fonctionnel : coordonnées, compteurs, dernière interaction, prochaine action, saisie d'interactions, timeline, relances |
+| Activity | Fonctionnel : indicateurs du jour, timeline globale filtrable, relances par échéance, saisie rapide |
+| Prospecting Pipeline, Objections, AI Copilot, Performance | Pages vides (à venir) |
 
 ## Base de données
 
