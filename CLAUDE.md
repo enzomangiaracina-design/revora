@@ -34,7 +34,10 @@
 - Ne pas créer de dossier `pages/` : Streamlit le transforme automatiquement en navigation multipage.
 - `DATABASE_PATH` est relatif à `database.py` (pas au dossier courant). `REVORA_DATABASE` permet de lancer l'app sur une autre base (ex. `demo.db`, générée par `seed_demo.py`) ; un bandeau l'indique. Le générateur de démo refuse d'écrire dans `revora.db`.
 - Équipe (phase 11) : table `users` ; `contacts.owner` reste un NOM (pas d'identifiant). L'utilisateur actif
-  (« Signed in as », `ctx.user`) n'est PAS une authentification : pas de mot de passe avant la phase 12.
+  (« Signed in as », `ctx.user`) n'est PAS une authentification : pas de mot de passe.
+- Vraie connexion (phase 12.1) : `st.login` (OIDC), active seulement si `.streamlit/secrets.toml` contient
+  `[auth]` complet (`ctx.auth`). Accès = email d'un membre actif de l'équipe. Jamais de mot de passe
+  stocké par REVORA ; `secrets.toml` reste hors de Git.
 - Interactions : `UNIQUE(provider, external_id)` garantit l'idempotence des synchronisations futures ; les saisies manuelles utilisent `provider = 'manual'`.
 - Les futurs connecteurs suivront l'interface `authenticate / test_connection / fetch_events / normalize_event / sync_events`, découplés du scoring.
 - Scoring prévu : global = 0,35 × Fit + 0,40 × Engagement + 0,25 × Intent (pondérations configurables, scores sur 100).

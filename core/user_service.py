@@ -10,14 +10,30 @@ proposer des noms cohérents (fini « Léa » / « Lea Martin » / « léa »).
 """
 
 import database
+from core.prospect_service import EMAIL_PATTERN
 
 ROLES = ["SDR", "Manager"]
 
 UNASSIGNED_LABEL = "Unassigned"
 
 
-def create_user(name, role="SDR"):
-    """Valide puis ajoute un utilisateur. Retourne (succès, message)."""
+def _clean_email(email):
+    """Email nettoyé (minuscules, sans espaces), "" si vide, None s'il est invalide."""
+
+    email = (email or "").strip().lower()
+
+    if email and not EMAIL_PATTERN.match(email):
+        return None
+
+    return email
+
+
+def create_user(name, role="SDR", email=None):
+    """Valide puis ajoute un utilisateur. Retourne (succès, message).
+
+    email (facultatif) : celui de son compte Google / Microsoft, utilisé par la
+    vraie connexion (phase 12.1).
+    """
 
     name = " ".join((name or "").split())          # espaces en trop retirés
 
@@ -27,10 +43,31 @@ def create_user(name, role="SDR"):
     if role not in ROLES:
         return False, "Choose a role: " + " or ".join(ROLES) + "."
 
-    if database.add_user(name, role) is None:
-        return False, f"{name} is already in the team."
+    email = _clean_email(email)
+    if email is None:
+        return False, "Enter a valid email, for example lea.martin@company.com."
+
+    if database.add_user(name, role, email or None) is None:
+        return False, f"{name} or this email is already in the team."
 
     return True, f"{name} added to the team."
+
+
+def set_email(user_id, email):
+    """Change l'email de connexion d'un utilisateur. Retourne (succès, message)."""
+
+    email = _clean_email(email)
+    if email is None:
+        return False, "Enter a valid email, for example lea.martin@company.com."
+
+    result = database.set_user_email(user_id, email or None)
+
+    if result is None:
+        return False, "This email is already used by another team member."
+    if not result:
+        return False, "User not found."
+
+    return True, "Email updated." if email else "Email removed."
 
 
 def set_role(user_id, role):

@@ -14,7 +14,9 @@ from core.score_service import refresh_scores
 import database
 from database import get_all_prospects, get_stage_names, get_users, initialize_database
 from screens import AppContext
-from screens.shared import close_prospect, error_state, signed_in_user
+from screens.shared import (
+    auth_enabled, close_prospect, error_state, require_login, sidebar_identity, signed_in_user,
+)
 from screens import overview, prospects, prospect_details, pipeline, activity, objections, copilot, performance, settings
 from ui import theme
 
@@ -50,6 +52,17 @@ ctx = AppContext(
 theme.apply_theme()
 
 # ==========================================
+# 2 bis. CONNEXION (phase 12.1)
+# ==========================================
+
+# Active seulement si .streamlit/secrets.toml contient une section [auth] complète.
+# Sinon : prototype local, menu « Signed in as » sans mot de passe (comme avant).
+ctx.auth = auth_enabled()
+
+if ctx.auth:
+    ctx.user = require_login(ctx.users)   # arrête la page tant que personne n'est connecté
+
+# ==========================================
 # 3. NAVIGATION
 # ==========================================
 
@@ -82,10 +95,13 @@ page = st.sidebar.radio(
 
 st.sidebar.divider()
 
-# Phase 11 : qui utilise REVORA (sans mot de passe pour l'instant)
-ctx.user = signed_in_user(ctx.users)
+# Qui utilise REVORA : compte connecté (vraie connexion) ou menu « Signed in as » (prototype local)
+if ctx.auth:
+    sidebar_identity(ctx.user)
+else:
+    ctx.user = signed_in_user(ctx.users)
 
-st.sidebar.caption("VERSION 0.34.0")
+st.sidebar.caption("VERSION 0.35.0")
 
 # Base de démonstration ou autre base choisie avec REVORA_DATABASE : toujours visible
 if not database.is_default_database():

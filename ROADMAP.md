@@ -127,8 +127,11 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ 11.3 Vue équipe « By sales owner » (managers) et performance personnelle par défaut (SDR) (v0.34.0)
 - ⬜ Vraie connexion (identifiants) : avec l'hébergement, phase 12
 ## Phase 12 — Production (PostgreSQL, hébergement, sécurité, monitoring) ⬜
-- ⬜ Choix de la voie : A (pilote SQLite + disque permanent) ou B (PostgreSQL) — en attente de décision
-- ⬜ 12.1 Vraie connexion (st.login, OIDC Google / Microsoft), testable en local — prérequis de la mémoire personnelle
+- ✅ Voie choisie : **A**, pilote SQLite sur disque permanent ; PostgreSQL plus tard (mémoire M3/M4)
+- ✅ 12.1 Vraie connexion (st.login, OIDC Google / Microsoft), inactive sans configuration (v0.35.0)
+- ⬜ 12.1 bis Premier test réel avec une application OAuth de test (à créer par l'utilisateur)
+- ⬜ 12.2 Hébergement du pilote (choix de l'hébergeur, disque permanent, HTTPS), données de démo uniquement
+- ⬜ 12.3 Sauvegardes automatiques et suivi des erreurs
 - ⬜ Organisations (isolation des données entre entreprises)
 
 ## Phase 13 — REVORA Intelligence (AI Copilot + REVORA MEMORY) ⬜ vision, non commencée

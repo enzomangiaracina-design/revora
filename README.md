@@ -52,6 +52,25 @@ Deux fournisseurs au choix (Settings › AI features › AI provider) :
 
 N'utilisez que des données de démonstration ou de test, sauf autorisation.
 
+### Activer la vraie connexion (facultatif, phase 12.1)
+
+Par défaut, REVORA est un prototype local : on choisit son nom dans « Signed in as », sans mot de passe.
+La vraie connexion passe par Google ou Microsoft (norme OIDC, via `st.login`) : REVORA ne voit ni ne
+stocke aucun mot de passe. Elle ne s'active que si `.streamlit/secrets.toml` contient une section
+`[auth]` complète.
+
+1. **Avant d'activer** : dans Settings › Team, ajoutez votre email de travail et donnez-vous le rôle
+   **Manager**. Avec la connexion, seuls les emails de l'équipe (membres actifs) peuvent entrer, et
+   seuls les managers peuvent modifier l'équipe.
+2. **Chez le fournisseur** (à faire vous-même, avec un compte de test) : créez une application OAuth
+   de type « Web application » et ajoutez l'adresse de retour `http://localhost:8501/oauth2callback`.
+   Notez le *client ID* et le *client secret*.
+3. Copiez `.streamlit/secrets.toml.example` en `.streamlit/secrets.toml` (exclu de Git) et remplissez
+   `cookie_secret`, `client_id`, `client_secret` (et l'URL Microsoft si besoin).
+4. Lancez l'application sur le port 8501 (arrêtez les autres sessions), puis **Sign in**.
+
+Pour revenir au prototype local : supprimez ou renommez la section `[auth]`.
+
 ## Base de démonstration (fictive)
 
 Pour tester ou faire une démo sans toucher à vos données, créez une base séparée `demo.db`

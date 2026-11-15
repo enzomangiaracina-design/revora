@@ -301,6 +301,13 @@ def initialize_database():
     _add_column_if_missing(cursor, "companies", "size", "TEXT")
     _add_column_if_missing(cursor, "companies", "country", "TEXT")
 
+    # MIGRATION (phase 12.1) : email des utilisateurs, pour la vraie connexion.
+    # Unique sans tenir compte des majuscules ; vide autorisé (NULL).
+    _add_column_if_missing(cursor, "users", "email", "TEXT")
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL"
+    )
+
     # MIGRATIONS (phase 5) : qualification confirmee par le commercial
     # (0 = non, 1 = oui) et explication des scores
     for column in QUALIFICATION_FIELDS:
@@ -1996,16 +2003,39 @@ def get_users(active_only=False):
     return [dict(row) for row in rows]
 
 
-def add_user(name, role):
-    """Ajoute un utilisateur. Retourne son id, ou None si le nom existe deja."""
+def add_user(name, role, email=None):
+    """Ajoute un utilisateur. Retourne son id, ou None si le nom ou l'email existe deja."""
 
     connection = get_connection()
 
     try:
-        cursor = connection.execute("INSERT INTO users (name, role) VALUES (?, ?)", (name.strip(), role))
+        cursor = connection.execute(
+            "INSERT INTO users (name, role, email) VALUES (?, ?, ?)", (name.strip(), role, _clean(email))
+        )
         connection.commit()
 
         return cursor.lastrowid
+
+    except sqlite3.IntegrityError:
+        return None
+
+    finally:
+        connection.close()
+
+
+def set_user_email(user_id, email):
+    """Change l'email d'un utilisateur (vide = aucun).
+
+    Retourne True, False si l'utilisateur n'existe pas, None si l'email est deja pris.
+    """
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute("UPDATE users SET email = ? WHERE id = ?", (_clean(email), user_id))
+        connection.commit()
+
+        return cursor.rowcount > 0
 
     except sqlite3.IntegrityError:
         return None

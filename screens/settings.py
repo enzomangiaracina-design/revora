@@ -4,16 +4,41 @@ from screens.common import *  # noqa: F401,F403
 from screens.shared import *  # noqa: F401,F403
 
 
-# ---------- Équipe (phase 11.1) : callbacks ----------
+# ---------- Équipe (phase 11.1, emails et droits : phase 12.1) : callbacks ----------
 
-def _change_role(user_id):
-    ok, message = set_user_role(user_id, st.session_state[f"team_role_{user_id}"])
+def _flash(ok, message):
     st.session_state["flash"] = message if ok else f"Error: {message}"
 
 
-def _change_active(user_id):
-    ok, message = set_user_active(user_id, st.session_state[f"team_active_{user_id}"])
-    st.session_state["flash"] = message if ok else f"Error: {message}"
+def _protect_self(user_id, protected_id, key, saved_value):
+    """Avec la vraie connexion, un manager ne peut pas se retirer ses propres droits (risque de blocage)."""
+
+    if protected_id is not None and user_id == protected_id:
+        st.session_state[key] = saved_value           # le contrôle réaffiche la valeur enregistrée
+        _flash(False, "You cannot change your own role or deactivate yourself while signed in.")
+        return True
+
+    return False
+
+
+def _change_role(user_id, protected_id, saved_role):
+    key = f"team_role_{user_id}"
+    if not _protect_self(user_id, protected_id, key, saved_role):
+        _flash(*set_user_role(user_id, st.session_state[key]))
+
+
+def _change_active(user_id, protected_id, saved_active):
+    key = f"team_active_{user_id}"
+    if not _protect_self(user_id, protected_id, key, saved_active):
+        _flash(*set_user_active(user_id, st.session_state[key]))
+
+
+def _change_email(user_id, saved_email):
+    key = f"team_email_{user_id}"
+    ok, message = set_user_email(user_id, st.session_state[key])
+    if not ok:
+        st.session_state[key] = saved_email or ""      # email refusé : le champ réaffiche l'ancien
+    _flash(ok, message)
 
 
 def _import_owners(prospects):
@@ -21,17 +46,34 @@ def _import_owners(prospects):
     st.session_state["flash"] = message
 
 
-def team_section(prospects):
-    """Liste de l'équipe : rôle, actif/inactif, ajout, import des propriétaires existants."""
+def _sign_in_status(ctx):
+    """État de la vraie connexion, affiché en tête de la section Team."""
+
+    if ctx.auth:
+        st.caption(":green[:material/lock:] **Sign-in is on**: each person signs in with the account "
+                   "whose email is listed below. Only managers can change the team.")
+        return
+
+    missing = auth_missing_settings(st.secrets)
+    if len(missing) < len(AUTH_REQUIRED_KEYS):           # section [auth] commencée mais incomplète
+        st.warning("Sign-in is configured but incomplete. Missing in .streamlit/secrets.toml › [auth]: "
+                   + ", ".join(missing) + ".", icon=":material/lock_open:")
+    else:
+        st.caption(":material/lock_open: **Sign-in is off** (local prototype): anyone who opens REVORA can "
+                   "pick a name in « Signed in as ». Add each person's work email now: it will be used "
+                   "when sign-in is turned on (see README).")
+
+
+def team_section(ctx, prospects):
+    """Équipe : email de connexion, rôle, actif/inactif, ajout, import des propriétaires existants."""
 
     st.subheader("Team")
-    st.caption(
-        "Sales reps and managers. Their names are proposed as sales owner and in the "
-        "« Signed in as » menu. No password yet: anyone who opens REVORA can pick a name — "
-        "real sign-in will come with hosting."
-    )
+    st.caption("Sales reps and managers. Their names are proposed as sales owner.")
+    _sign_in_status(ctx)
 
     users = get_users()
+    can_edit = can_manage_team(ctx.user, ctx.auth)
+    protected_id = ctx.user["id"] if ctx.auth and ctx.user else None
     missing = missing_owners(users, prospects)
     import_action = {
         "label": f"Add {len(missing)} sales owner(s) from your prospects", "icon": ":material/group_add:",
@@ -43,37 +85,51 @@ def team_section(prospects):
             "No team member yet",
             "Add yourself and your colleagues below"
             + (f", or import the sales owners already on your prospects ({', '.join(missing)})." if missing else "."),
-            [import_action] if missing else [], icon=":material/group:", key="team_empty",
+            [import_action] if missing and can_edit else [], icon=":material/group:", key="team_empty",
         )
     else:
         with st.container(border=True):
             for user in users:
-                col_name, col_role, col_active = st.columns([3, 2, 1.5], vertical_alignment="center")
+                # Nom et email l'un sous l'autre : la colonne principale est étroite
+                col_name, col_role, col_active = st.columns([3.2, 1.8, 0.8], vertical_alignment="center")
                 col_name.markdown(user["name"] if user["active"] else f":gray[{user['name']} · inactive]")
+                col_name.text_input(
+                    "Email", value=user.get("email") or "", key=f"team_email_{user['id']}",
+                    placeholder="work email for sign-in", label_visibility="collapsed",
+                    on_change=_change_email, args=(user["id"], user.get("email")), disabled=not can_edit,
+                )
                 col_role.selectbox(
                     "Role", USER_ROLES, index=USER_ROLES.index(user["role"]) if user["role"] in USER_ROLES else 0,
                     key=f"team_role_{user['id']}", label_visibility="collapsed",
-                    on_change=_change_role, args=(user["id"],),
+                    on_change=_change_role, args=(user["id"], protected_id, user["role"]), disabled=not can_edit,
                 )
                 col_active.toggle(
                     "Active", value=bool(user["active"]), key=f"team_active_{user['id']}",
-                    on_change=_change_active, args=(user["id"],),
-                    help="Inactive users stay in history but are no longer proposed in lists.",
+                    on_change=_change_active, args=(user["id"], protected_id, bool(user["active"])),
+                    disabled=not can_edit,
+                    label_visibility="collapsed",
+                    help="Active. Inactive users stay in history but can no longer sign in or be chosen.",
                 )
 
-        if missing:
+        if missing and can_edit:
             st.caption(f"Sales owners on your prospects but not in the team: {', '.join(missing)}.")
             st.button(import_action["label"], icon=import_action["icon"], key="team_import",
                       on_click=_import_owners, args=(prospects,))
 
+    if not can_edit:
+        st.caption("Only managers can change the team.")
+        return
+
     with st.form("team_add_form", clear_on_submit=True):
-        col_name, col_role, col_submit = st.columns([3, 2, 1.5], vertical_alignment="bottom")
+        col_name, col_email = st.columns(2)
         name = col_name.text_input("Name", placeholder="Example: Léa Martin")
+        email = col_email.text_input("Email (optional)", placeholder="lea.martin@company.com")
+        col_role, col_submit = st.columns(2, vertical_alignment="bottom")
         role = col_role.selectbox("Role", USER_ROLES)
-        submitted = col_submit.form_submit_button("Add", icon=":material/person_add:", width="stretch")
+        submitted = col_submit.form_submit_button("Add to team", icon=":material/person_add:", width="stretch")
 
     if submitted:
-        ok, message = create_user(name, role)
+        ok, message = create_user(name, role, email)
 
         if ok:
             st.session_state["flash"] = message
@@ -265,7 +321,7 @@ def render(ctx):
     # ---------- EQUIPE (phase 11.1) ----------
 
     st.divider()
-    team_section(prospects)
+    team_section(ctx, prospects)
 
     # ---------- INTEGRATIONS ----------
 

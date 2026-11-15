@@ -1,5 +1,31 @@
 # CHANGELOG — REVORA
 
+## [0.35.0] — 2026-11-15 — Phase 12.1 : vraie connexion (voie A)
+
+### Ajouté
+- **Vraie connexion** par Google ou Microsoft (`st.login`, norme OIDC) : REVORA ne voit ni ne stocke
+  aucun mot de passe. **Inactive tant que `.streamlit/secrets.toml` n'a pas de section `[auth]`
+  complète** : sans elle, REVORA reste le prototype local (« Signed in as »), comme avant.
+  - Écran « Sign in to REVORA » ; la navigation n'apparaît qu'après connexion.
+  - Seuls les **membres actifs de l'équipe** dont l'email correspond peuvent entrer ; email non vérifié
+    par le fournisseur refusé ; sinon écran « Access not granted » avec « Sign out ».
+  - Barre latérale : « Signed in as **Nom** · Rôle » et « Sign out ».
+  - Avec la connexion, **seuls les managers** modifient l'équipe, et un manager ne peut pas se retirer
+    ses propres droits (pas de blocage).
+- Settings › Team : **email de connexion** de chaque membre (validé, unique sans tenir compte des
+  majuscules), état « Sign-in is on / off », alerte si la configuration est incomplète.
+  Mise en page revue (email sous le nom ; formulaire d'ajout sur deux lignes) : plus rien de coupé.
+- Migration additive : colonne `users.email` + index unique. `core/auth_service.py`,
+  `user_service.set_email`, `database.set_user_email`.
+- Dépendance **Authlib ≥ 1.3.2** (exigée par `st.login`). Modèle `.streamlit/secrets.toml.example` ;
+  procédure dans le README.
+
+### Tests
+- 384 tests (9 nouveaux dans `tests/test_auth.py`), sans contacter de vrai fournisseur.
+- Navigateur, sur une copie de `demo.db` : sans configuration, rien ne change ; avec une configuration
+  factice (hors du projet), l'écran de connexion bloque l'application. Email invalide refusé et effacé.
+- **Non vérifié** : une connexion réelle de bout en bout (il faut une application OAuth créée par vous).
+
 ## [Documentation] — 2026-11-15 — Conception de REVORA Intelligence
 
 ### Ajouté

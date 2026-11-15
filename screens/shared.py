@@ -37,6 +37,60 @@ def reset_form(form_key):
 USER_KEY = "user"   # clé du menu « Signed in as » (et paramètre ?user=<id> de l'URL)
 
 
+# ---------- Vraie connexion (phase 12.1) ----------
+
+def auth_enabled():
+    """True si une section [auth] complète existe dans .streamlit/secrets.toml."""
+
+    return auth_is_configured(st.secrets)
+
+
+def _identity_claims():
+    """Identité renvoyée par le fournisseur (dictionnaire), ou None si personne n'est connecté."""
+
+    info = st.user.to_dict()          # .get() : la clé peut manquer (aucune session, tests)
+
+    return info if info.get("is_logged_in") else None
+
+
+def require_login(users):
+    """Porte d'entrée : arrête la page tant que la personne n'est pas connectée ET dans l'équipe.
+
+    Retourne l'utilisateur REVORA correspondant à l'email du compte connecté.
+    """
+
+    claims = _identity_claims()
+
+    if not claims:
+        st.title("Sign in to REVORA")
+        st.caption("Use your work Google or Microsoft account. REVORA never sees or stores your password.")
+        if st.button("Sign in", type="primary", icon=":material/login:"):
+            st.login()
+        st.stop()
+
+    user, message = resolve_user(users, claims)
+
+    if not user:
+        st.title("Access not granted")
+        st.warning(message, icon=":material/lock:")
+        if st.button("Sign out", icon=":material/logout:"):
+            st.logout()
+        st.stop()
+
+    st.session_state[USER_KEY] = user["id"]     # même clé que « Signed in as » (propriétaire par défaut…)
+
+    return user
+
+
+def sidebar_identity(user):
+    """Barre latérale avec la vraie connexion : qui est connecté, et « Sign out »."""
+
+    st.sidebar.caption(f"Signed in as **{user['name']}** · {user['role']}")
+
+    if st.sidebar.button("Sign out", icon=":material/logout:", type="tertiary", key="sign_out"):
+        st.logout()
+
+
 def signed_in_user(users):
     """Menu « Signed in as » de la barre latérale. Retourne l'utilisateur choisi, ou None.
 

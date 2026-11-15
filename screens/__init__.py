@@ -11,4 +11,5 @@ class AppContext:
     stage_names: list
     scores: dict
     users: list = field(default_factory=list)   # équipe (phase 11)
-    user: dict | None = None                    # utilisateur choisi dans « Signed in as »
+    user: dict | None = None                    # utilisateur actif (« Signed in as » ou vraie connexion)
+    auth: bool = False                          # vraie connexion activée (phase 12.1)

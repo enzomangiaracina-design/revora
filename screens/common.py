@@ -186,6 +186,15 @@ from core.copilot_service import (
 
 from database import get_setting, set_setting
 
+# Vraie connexion (phase 12.1)
+from core.auth_service import (
+    is_configured as auth_is_configured,
+    missing_settings as auth_missing_settings,
+    REQUIRED_AUTH_KEYS as AUTH_REQUIRED_KEYS,
+    resolve_user,
+    can_manage_team,
+)
+
 # Équipe (phase 11)
 from database import get_users
 from core.user_service import (
@@ -193,6 +202,7 @@ from core.user_service import (
     UNASSIGNED_LABEL,
     create_user,
     set_role as set_user_role,
+    set_email as set_user_email,
     set_active as set_user_active,
     missing_owners,
     import_owners,
