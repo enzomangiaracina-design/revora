@@ -184,3 +184,17 @@ from core.copilot_service import (
 )
 
 from database import get_setting, set_setting
+
+# Équipe (phase 11)
+from database import get_users
+from core.user_service import (
+    ROLES as USER_ROLES,
+    UNASSIGNED_LABEL,
+    create_user,
+    set_role as set_user_role,
+    set_active as set_user_active,
+    missing_owners,
+    import_owners,
+    owner_choices,
+    find_user,
+)

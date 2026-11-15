@@ -270,6 +270,19 @@ def initialize_database():
         )
     """)
 
+    # UTILISATEURS (phase 11) : les commerciaux et managers de l'equipe.
+    # contacts.owner reste un NOM (texte) : aucune donnee existante n'est convertie.
+    # Pas de suppression : un utilisateur qui part est desactive (l'historique reste lisible).
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            role TEXT NOT NULL DEFAULT 'SDR',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # REGLAGES (ex. configuration du scoring), stockes en JSON par cle
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS settings (
@@ -1960,6 +1973,69 @@ def create_task(contact_id, title, description, due_at):
 # ==========================================
 # 9. RECUPERATION DES RELANCES
 # ==========================================
+
+# ==========================================
+# UTILISATEURS (phase 11)
+# ==========================================
+
+def get_users(active_only=False):
+    """Utilisateurs, actifs d'abord puis par nom."""
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        f"""
+        SELECT * FROM users
+        {"WHERE active = 1" if active_only else ""}
+        ORDER BY active DESC, name COLLATE NOCASE
+        """
+    ).fetchall()
+
+    connection.close()
+
+    return [dict(row) for row in rows]
+
+
+def add_user(name, role):
+    """Ajoute un utilisateur. Retourne son id, ou None si le nom existe deja."""
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute("INSERT INTO users (name, role) VALUES (?, ?)", (name.strip(), role))
+        connection.commit()
+
+        return cursor.lastrowid
+
+    except sqlite3.IntegrityError:
+        return None
+
+    finally:
+        connection.close()
+
+
+def update_user(user_id, role=None, active=None):
+    """Change le role et/ou l'etat actif d'un utilisateur. Retourne True s'il existe."""
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute(
+            """
+            UPDATE users
+            SET role = COALESCE(?, role),
+                active = COALESCE(?, active)
+            WHERE id = ?
+            """,
+            (role, None if active is None else int(bool(active)), user_id)
+        )
+        connection.commit()
+
+        return cursor.rowcount > 0
+
+    finally:
+        connection.close()
+
 
 def get_recent_stage_changes(limit=20):
     """Derniers changements d'etape, tous prospects confondus (plus recent d'abord).

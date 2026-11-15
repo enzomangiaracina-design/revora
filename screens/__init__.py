@@ -1,6 +1,6 @@
 """Pages de l'application REVORA (une page = un module avec render(ctx))."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -10,3 +10,5 @@ class AppContext:
     prospects: list
     stage_names: list
     scores: dict
+    users: list = field(default_factory=list)   # équipe (phase 11)
+    user: dict | None = None                    # utilisateur choisi dans « Signed in as »

@@ -4,6 +4,84 @@ from screens.common import *  # noqa: F401,F403
 from screens.shared import *  # noqa: F401,F403
 
 
+# ---------- Équipe (phase 11.1) : callbacks ----------
+
+def _change_role(user_id):
+    ok, message = set_user_role(user_id, st.session_state[f"team_role_{user_id}"])
+    st.session_state["flash"] = message if ok else f"Error: {message}"
+
+
+def _change_active(user_id):
+    ok, message = set_user_active(user_id, st.session_state[f"team_active_{user_id}"])
+    st.session_state["flash"] = message if ok else f"Error: {message}"
+
+
+def _import_owners(prospects):
+    _, message = import_owners(get_users(), prospects)
+    st.session_state["flash"] = message
+
+
+def team_section(prospects):
+    """Liste de l'équipe : rôle, actif/inactif, ajout, import des propriétaires existants."""
+
+    st.subheader("Team")
+    st.caption(
+        "Sales reps and managers. Their names are proposed as sales owner and in the "
+        "« Signed in as » menu. No password yet: anyone who opens REVORA can pick a name — "
+        "real sign-in will come with hosting."
+    )
+
+    users = get_users()
+    missing = missing_owners(users, prospects)
+    import_action = {
+        "label": f"Add {len(missing)} sales owner(s) from your prospects", "icon": ":material/group_add:",
+        "on_click": _import_owners, "args": (prospects,),
+    }
+
+    if not users:
+        empty_state(
+            "No team member yet",
+            "Add yourself and your colleagues below"
+            + (f", or import the sales owners already on your prospects ({', '.join(missing)})." if missing else "."),
+            [import_action] if missing else [], icon=":material/group:", key="team_empty",
+        )
+    else:
+        with st.container(border=True):
+            for user in users:
+                col_name, col_role, col_active = st.columns([3, 2, 1.5], vertical_alignment="center")
+                col_name.markdown(user["name"] if user["active"] else f":gray[{user['name']} · inactive]")
+                col_role.selectbox(
+                    "Role", USER_ROLES, index=USER_ROLES.index(user["role"]) if user["role"] in USER_ROLES else 0,
+                    key=f"team_role_{user['id']}", label_visibility="collapsed",
+                    on_change=_change_role, args=(user["id"],),
+                )
+                col_active.toggle(
+                    "Active", value=bool(user["active"]), key=f"team_active_{user['id']}",
+                    on_change=_change_active, args=(user["id"],),
+                    help="Inactive users stay in history but are no longer proposed in lists.",
+                )
+
+        if missing:
+            st.caption(f"Sales owners on your prospects but not in the team: {', '.join(missing)}.")
+            st.button(import_action["label"], icon=import_action["icon"], key="team_import",
+                      on_click=_import_owners, args=(prospects,))
+
+    with st.form("team_add_form", clear_on_submit=True):
+        col_name, col_role, col_submit = st.columns([3, 2, 1.5], vertical_alignment="bottom")
+        name = col_name.text_input("Name", placeholder="Example: Léa Martin")
+        role = col_role.selectbox("Role", USER_ROLES)
+        submitted = col_submit.form_submit_button("Add", icon=":material/person_add:", width="stretch")
+
+    if submitted:
+        ok, message = create_user(name, role)
+
+        if ok:
+            st.session_state["flash"] = message
+            st.rerun()
+        else:
+            st.error(message)
+
+
 def _choose_provider():
     name = st.session_state["ai_provider_choice"]
     set_setting(AI_PROVIDER_SETTING, name)
@@ -183,6 +261,11 @@ def render(ctx):
                         {"language": language, "tone": tone, "signature": signature.strip()})
             st.session_state["flash"] = "Email style saved."
             st.rerun()
+
+    # ---------- EQUIPE (phase 11.1) ----------
+
+    st.divider()
+    team_section(prospects)
 
     # ---------- INTEGRATIONS ----------
 

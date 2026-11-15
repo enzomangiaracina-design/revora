@@ -12,9 +12,9 @@ import streamlit as st
 
 from core.score_service import refresh_scores
 import database
-from database import get_all_prospects, get_stage_names, initialize_database
+from database import get_all_prospects, get_stage_names, get_users, initialize_database
 from screens import AppContext
-from screens.shared import close_prospect, error_state
+from screens.shared import close_prospect, error_state, signed_in_user
 from screens import overview, prospects, prospect_details, pipeline, activity, objections, copilot, performance, settings
 from ui import theme
 
@@ -38,6 +38,7 @@ ctx = AppContext(
     prospects=get_all_prospects(),
     stage_names=get_stage_names(),
     scores=refresh_scores(),
+    users=get_users(),
 )
 
 # ==========================================
@@ -80,7 +81,11 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.31.0")
+
+# Phase 11 : qui utilise REVORA (sans mot de passe pour l'instant)
+ctx.user = signed_in_user(ctx.users)
+
+st.sidebar.caption("VERSION 0.32.0")
 
 # Base de démonstration ou autre base choisie avec REVORA_DATABASE : toujours visible
 if not database.is_default_database():

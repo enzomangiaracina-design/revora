@@ -1,5 +1,26 @@
 # CHANGELOG — REVORA
 
+## [0.32.0] — 2026-11-15 — Phase 11.1 : équipe et utilisateur actif
+
+### Ajouté
+- Table **`users`** (nom unique sans tenir compte des majuscules, rôle SDR ou Manager, actif/inactif).
+  Migration additive : aucune donnée existante n'est modifiée ; `contacts.owner` reste un nom.
+- Settings › **Team** : ajouter un membre, changer son rôle, le désactiver (jamais supprimé : il
+  reste dans l'historique). Bouton « Add N sales owner(s) from your prospects » qui reprend les
+  propriétaires déjà saisis, sans toucher aux prospects.
+- Barre latérale : menu **« Signed in as »**. Le choix est gardé dans l'URL sous forme d'identifiant
+  (`?user=3`, jamais le nom) et survit au rechargement. Prototype **sans mot de passe** : une vraie
+  connexion viendra avec l'hébergement (phase 12).
+- Formulaire prospect : le **Sales owner** se choisit dans l'équipe (« Unassigned » possible) ; pour
+  un nouveau prospect, l'utilisateur actif est proposé par défaut. Un propriétaire absent de l'équipe
+  est conservé à la modification. Sans équipe, saisie libre comme avant.
+- `core/user_service.py`, `database.get_users / add_user / update_user`, `AppContext.users / user`.
+
+### Tests
+- 369 tests (5 nouveaux dans `tests/test_users.py`). Vérifié dans le navigateur sur une copie de
+  `demo.db` : import de Léa et Hugo, ajout d'une manager, choix gardé après rechargement,
+  propriétaire proposé par défaut. `revora.db` et `demo.db` inchangées.
+
 ## [0.31.0] — 2026-11-15 — Finitions : étapes dans le fil, infos entreprise
 
 ### Ajouté

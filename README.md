@@ -137,7 +137,7 @@ git clone https://github.com/enzomangiaracina-design/revora.git
 | Prospect Details | Fonctionnel : coordonnées, compteurs, dernière interaction, prochaine action, saisie d'interactions, timeline, relances |
 | Activity | Fonctionnel : indicateurs du jour, timeline globale filtrable, relances par échéance, saisie rapide |
 | Prospecting Pipeline | Fonctionnel : tableau façon HubSpot (glisser-déposer), filtres rapides, tri, vues Table / Priorités / Étapes |
-| Settings | Fonctionnel : configuration du scoring, calibration, état des intégrations (non connectées) |
+| Settings | Fonctionnel : configuration du scoring, calibration, équipe (rôles, actif/inactif), état des intégrations (non connectées) |
 | Objections | Fonctionnel : saisie, statistiques, playbook de réponses, exemples anonymisés, journal |
 | Performance | Fonctionnel : indicateurs d'activité et de résultats, comparaison de périodes, par verticale |
 | AI Copilot | Chat sur toute la base (réponses sourcées, lecture seule) + dans la fiche prospect : préparation d'appel et brouillon d'email. + détection des objections dans les notes (suggestions à confirmer). Désactivé par défaut, Claude ou Gemini |

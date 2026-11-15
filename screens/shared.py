@@ -30,6 +30,65 @@ def reset_form(form_key):
     st.session_state[version_key] = st.session_state.get(version_key, 0) + 1
 
 
+# ==========================================
+# UTILISATEUR ACTIF (phase 11.1)
+# ==========================================
+
+USER_KEY = "user"   # clé du menu « Signed in as » (et paramètre ?user=<id> de l'URL)
+
+
+def signed_in_user(users):
+    """Menu « Signed in as » de la barre latérale. Retourne l'utilisateur choisi, ou None.
+
+    Prototype sans mot de passe. Le choix est gardé dans l'URL (?user=3, un
+    identifiant, jamais le nom) : il survit au rechargement de la page.
+    """
+
+    active = [u for u in users if u["active"]]
+
+    if not active:
+        st.sidebar.caption("No team yet: add it in Settings › Team.")
+        return None
+
+    labels = {u["id"]: f"{u['name']} · {u['role']}" for u in active}
+
+    # Page rechargée : on retrouve le choix à partir de l'URL (?user=3)
+    if USER_KEY not in st.session_state:
+        from_url = st.query_params.get(USER_KEY, "")
+        st.session_state[USER_KEY] = int(from_url) if from_url.isdigit() and int(from_url) in labels else None
+
+    # Utilisateur désactivé entre-temps : plus proposé
+    if st.session_state[USER_KEY] not in labels:
+        st.session_state[USER_KEY] = None
+
+    chosen = st.sidebar.selectbox(
+        "Signed in as", list(labels), format_func=labels.get,
+        placeholder="Choose your name", key=USER_KEY, on_change=_remember_user,
+    )
+
+    return next((u for u in active if u["id"] == chosen), None)
+
+
+def _remember_user():
+    """Callback : garde l'identifiant (jamais le nom) dans l'URL."""
+
+    chosen = st.session_state.get(USER_KEY)
+
+    if chosen is None:
+        st.query_params.pop(USER_KEY, None)
+    else:
+        st.query_params[USER_KEY] = str(chosen)
+
+
+def current_user_name():
+    """Nom de l'utilisateur choisi dans « Signed in as », ou None."""
+
+    chosen = st.session_state.get(USER_KEY)
+    user = next((u for u in get_users(active_only=True) if u["id"] == chosen), None)
+
+    return user["name"] if user else None
+
+
 def prospect_form(form_key, verticals, submit_label, defaults=None):
     """Formulaire prospect, vide (creation) ou pre-rempli (modification).
 
@@ -94,7 +153,21 @@ def prospect_form(form_key, verticals, submit_label, defaults=None):
             "Source", value=defaults.get("source") or "",
             placeholder="Example: HubSpot list, trade show, referral"
         )
-        owner = col2.text_input("Sales owner", value=defaults.get("owner") or "")
+        # Phase 11 : propriétaire choisi dans l'équipe (sinon saisie libre, comme avant).
+        # Nouveau prospect : l'utilisateur actif par défaut.
+        team = get_users(active_only=True)
+        current_owner = defaults.get("owner") if defaults else current_user_name()
+
+        if team:
+            choices = owner_choices(team, current_owner)
+            owner = col2.selectbox(
+                "Sales owner", choices,
+                index=next((i for i, n in enumerate(choices) if n.casefold() == (current_owner or "").casefold()), 0),
+                format_func=lambda name: name or UNASSIGNED_LABEL,
+            )
+        else:
+            owner = col2.text_input("Sales owner", value=current_owner or "",
+                                    help="Tip: add your team in Settings › Team to choose from a list.")
 
         linkedin_url = st.text_input(
             "LinkedIn profile URL", value=defaults.get("linkedin_url") or "",
