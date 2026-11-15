@@ -127,3 +127,17 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ 11.3 Vue équipe « By sales owner » (managers) et performance personnelle par défaut (SDR) (v0.34.0)
 - ⬜ Vraie connexion (identifiants) : avec l'hébergement, phase 12
 ## Phase 12 — Production (PostgreSQL, hébergement, sécurité, monitoring) ⬜
+- ⬜ Choix de la voie : A (pilote SQLite + disque permanent) ou B (PostgreSQL) — en attente de décision
+- ⬜ 12.1 Vraie connexion (st.login, OIDC Google / Microsoft), testable en local — prérequis de la mémoire personnelle
+- ⬜ Organisations (isolation des données entre entreprises)
+
+## Phase 13 — REVORA Intelligence (AI Copilot + REVORA MEMORY) ⬜ vision, non commencée
+Conception : `docs/REVORA_INTELLIGENCE.md`. Un seul espace (Copilot · Memory & Knowledge ·
+Personalization), un seul assistant. Ne démarre qu'après les fondations (phase 12.1, identité, ergonomie).
+- ⬜ I0 Regroupement : « AI Copilot » devient « REVORA Intelligence » (3 onglets)
+- ⬜ Fondations mémoire : auteur des actions (`created_by`), journal d'événements, `tasks.completed_at`
+- ⬜ M1 Interaction Memory : recherche plein texte, souvenirs prospect sourcés et validés
+- ⬜ M2 User Memory : observation → hypothèse → préférence confirmée (nécessite la vraie connexion)
+- ⬜ M3 Knowledge Memory : objection → réponse utilisée → issue, par secteur
+- ⬜ M4 Personalized Copilot : souvenirs autorisés cités comme sources (PostgreSQL + pgvector conseillés)
+- ⬜ M5 Team Memory : pratiques validées par les managers, isolation par organisation

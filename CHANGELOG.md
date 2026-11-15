@@ -1,5 +1,14 @@
 # CHANGELOG — REVORA
 
+## [Documentation] — 2026-11-15 — Conception de REVORA Intelligence
+
+### Ajouté
+- `docs/REVORA_INTELLIGENCE.md` : conception de **REVORA Intelligence** (fusion AI Copilot + REVORA
+  MEMORY en un seul espace) — compatibilité avec l'existant, données manquantes, architecture cible
+  (mémoire relationnelle, provenance, permissions, moteur hors affichage), confidentialité, phasage M1–M5.
+- ROADMAP : phase 13 « REVORA Intelligence » (vision, non commencée) et détail de la phase 12.
+- Aucun code modifié.
+
 ## [0.34.0] — 2026-11-15 — Phase 11.3 : vue équipe dans Performance
 
 ### Ajouté
