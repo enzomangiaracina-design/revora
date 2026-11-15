@@ -112,5 +112,6 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ Premier appel réel (Gemini, données de démo) : brief et email corrects et sourcés, ~2 s (v0.26.1)
 - ⬜ Premier appel réel avec Claude (nécessite une clé Anthropic)
 - ✅ 10.2 Chat sur l'ensemble de la base : réponses sourcées, lecture seule, hors-sujet refusé (v0.27.0)
+- ✅ Style des brouillons d'email : langue, ton (vouvoiement), signature (v0.28.0)
 ## Phase 11 — Multi-utilisateur ⬜
 ## Phase 12 — Production (PostgreSQL, hébergement, sécurité, monitoring) ⬜

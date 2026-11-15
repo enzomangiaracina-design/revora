@@ -172,7 +172,8 @@ def _run_ai(task, contact_id, context):
     """Callback : génère le brief ou le brouillon (un clic = un appel à l'API)."""
 
     try:
-        data, usage = ai_generate(AI_SYSTEM_PROMPT, ai_build_prompt(task, context), AI_SCHEMAS[task])
+        prompt = ai_build_prompt(task, context, style=ai_email_style(get_setting(AI_EMAIL_STYLE_SETTING)))
+        data, usage = ai_generate(AI_SYSTEM_PROMPT, prompt, AI_SCHEMAS[task])
     except CopilotError as error:
         st.session_state[f"ai_{task}_{contact_id}"] = {"error": str(error)}
         return

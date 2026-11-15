@@ -67,7 +67,8 @@ leave it out or put it under hypotheses, worded as a hypothesis, with the record
 Never invent names, numbers, budgets, dates, competitors or commitments.
 
 Write in English, concisely, for a busy SDR. Notes in the record may be written in French; that is
-expected."""
+expected. REVORA is the SDR's internal tool, not the product being sold: never mention REVORA to the
+prospect, and do not name the product unless the record names it."""
 
 TASKS = {
     "call_brief": (
@@ -79,14 +80,58 @@ TASKS = {
         "If an objection was raised and a recommended response exists in the playbook, use it."
     ),
     "email_draft": (
-        "Draft a short follow-up email to this prospect (under 150 words), in the language of the "
-        "latest exchanges. Reference only things that actually happened. Do not promise anything "
-        "that is not in the record. Use the playbook response if an objection is open.\n"
-        "- subject and body: the email, ready to be reviewed by the SDR. No placeholders except "
-        "[Your name] for the signature.\n"
+        "Draft a short follow-up email to this prospect (under 150 words). Reference only things that "
+        "actually happened. Do not promise anything that is not in the record. Use the playbook "
+        "response if an objection is open.\n"
+        "- subject and body: the email, ready to be reviewed by the SDR. Write the body in 2 to 4 short "
+        "paragraphs separated by a blank line (greeting on its own line, sign-off on its own lines). "
+        "Check spelling carefully. No placeholders except [Your name] for the signature.\n"
         "- facts_used: the facts from the record the email relies on, each with its sources."
     ),
 }
+
+# ---------- Style des emails (réglage « ai_email_style », modifiable dans Settings) ----------
+
+SETTING_EMAIL_STYLE = "ai_email_style"
+
+EMAIL_LANGUAGES = ["Auto", "English", "French"]
+EMAIL_TONES = ["Formal", "Friendly"]
+DEFAULT_EMAIL_STYLE = {"language": "Auto", "tone": "Formal", "signature": ""}
+
+
+def email_style(saved=None):
+    """Style complet : les valeurs enregistrées, complétées par les valeurs par défaut."""
+
+    style = {**DEFAULT_EMAIL_STYLE, **(saved or {})}
+
+    if style["language"] not in EMAIL_LANGUAGES:
+        style["language"] = DEFAULT_EMAIL_STYLE["language"]
+    if style["tone"] not in EMAIL_TONES:
+        style["tone"] = DEFAULT_EMAIL_STYLE["tone"]
+
+    style["signature"] = (style.get("signature") or "").strip()
+    return style
+
+
+def email_instructions(style):
+    """Consignes de style ajoutées à la demande de brouillon d'email."""
+
+    style = email_style(style)
+    language = ("the language of the latest exchanges (English if there are none)"
+                if style["language"] == "Auto" else style["language"])
+    lines = [f"Style: write the email in {language}."]
+
+    if style["tone"] == "Formal":
+        lines.append("Tone: formal and polite. In French, always use « vous » (never « tu »).")
+    else:
+        lines.append("Tone: warm and friendly, still professional. In French, use « vous » unless the "
+                     "record shows that the SDR already uses « tu » with this prospect.")
+
+    if style["signature"]:
+        lines.append(f"Sign the email exactly as: {style['signature']} (instead of [Your name]).")
+
+    return "\n".join(lines)
+
 
 SCHEMAS = {"call_brief": CALL_BRIEF_SCHEMA, "email_draft": EMAIL_SCHEMA}
 
@@ -157,12 +202,16 @@ def build_context(prospect, interactions, objections, playbook, limit=MAX_INTERA
     }
 
 
-def build_prompt(task, context):
-    """Message envoyé à l'IA : la tâche, puis le dossier du prospect (sans les libellés internes)."""
+def build_prompt(task, context, style=None):
+    """Message envoyé à l'IA : la tâche (et le style pour un email), puis le dossier du prospect."""
 
-    record ={key: value for key, value in context.items() if key != "labels"}
+    record = {key: value for key, value in context.items() if key != "labels"}
+    instructions = TASKS[task]
 
-    return f"{TASKS[task]}\n\nProspect record (JSON):\n{json.dumps(record, ensure_ascii=False, indent=1)}"
+    if task == "email_draft":
+        instructions += "\n" + email_instructions(style)
+
+    return f"{instructions}\n\nProspect record (JSON):\n{json.dumps(record, ensure_ascii=False, indent=1)}"
 
 
 # ==========================================

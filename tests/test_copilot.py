@@ -491,3 +491,63 @@ def test_chat_error_is_shown(record, monkeypatch):
 
     assert not at.exception
     assert any("overloaded" in e.value for e in at.error)
+
+
+# ---------- Style des emails ----------
+
+def test_email_style_defaults_and_unknown_values():
+    assert copilot.email_style(None) == {"language": "Auto", "tone": "Formal", "signature": ""}
+    assert copilot.email_style({"language": "Klingon", "tone": "Rude", "signature": " Léa "}) == {
+        "language": "Auto", "tone": "Formal", "signature": "Léa"}
+
+
+def test_email_instructions_follow_the_style():
+    formal = copilot.email_instructions({"language": "French", "tone": "Formal", "signature": "Léa Martin"})
+
+    assert "in French" in formal and "never « tu »" in formal
+    assert "Sign the email exactly as: Léa Martin" in formal
+    assert "latest exchanges" in copilot.email_instructions(None)
+
+
+def test_style_only_applies_to_emails(record):
+    _, _, context = record
+    style = {"language": "French", "tone": "Formal", "signature": "Léa"}
+
+    assert "Style:" in copilot.build_prompt("email_draft", context, style=style)
+    assert "Style:" not in copilot.build_prompt("call_brief", context, style=style)
+    assert "short paragraphs" in copilot.build_prompt("email_draft", context)
+
+
+def test_saved_style_reaches_the_prompt(record, monkeypatch):
+    thomas, _, _ = record
+    database.set_setting(copilot.SETTING_ENABLED, True)
+    database.set_setting(copilot.SETTING_EMAIL_STYLE, {"language": "French", "tone": "Formal", "signature": "Léa Martin"})
+    monkeypatch.setattr(screens.prospect_details, "ai_is_configured", lambda: True)
+    sent = {}
+
+    def fake(system, prompt, schema):
+        sent["prompt"] = prompt
+        return {"subject": "Suite", "body": "Bonjour Thomas,\n\nMerci.\n\nLéa Martin", "facts_used": []}, \
+            {"input_tokens": 1, "output_tokens": 1, "model": "fake"}
+
+    monkeypatch.setattr(screens.prospect_details, "ai_generate", fake)
+
+    at = open_file(thomas)
+    at.button(key=f"ai_email_draft_btn_{thomas}").click().run()
+
+    assert not at.exception
+    assert "Sign the email exactly as: Léa Martin" in sent["prompt"] and "in French" in sent["prompt"]
+
+
+def test_settings_saves_email_style(temp_db):
+    at = AppTest.from_file(MAIN, default_timeout=60).run()
+    at.sidebar.radio[0].set_value(next(o for o in at.sidebar.radio[0].options if o.endswith("Settings"))).run()
+    form = [w for w in at.selectbox if w.label == "Language"][0]
+    form.set_value("French")
+    [w for w in at.selectbox if w.label == "Tone"][0].set_value("Friendly")
+    [w for w in at.text_input if w.label == "Signature"][0].set_value("Léa Martin")
+    [b for b in at.button if b.label == "Save email style"][0].click().run()
+
+    assert not at.exception
+    assert database.get_setting(copilot.SETTING_EMAIL_STYLE) == {"language": "French", "tone": "Friendly",
+                                                                "signature": "Léa Martin"}

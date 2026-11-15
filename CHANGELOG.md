@@ -1,5 +1,28 @@
 # CHANGELOG — REVORA
 
+## [0.28.0] — 2026-11-15 — Style des brouillons d'email
+
+### Ajouté
+- Settings › AI features › **Email drafts** : langue (Auto / English / French), ton
+  (Formal / Friendly) et signature. « Formal » impose le vouvoiement en français ; « Friendly »
+  garde le vouvoiement sauf si l'historique montre déjà un tutoiement. La signature remplace
+  « [Your name] ». Réglage `ai_email_style` (valeurs inconnues → valeurs par défaut).
+
+### Modifié
+- Brouillons d'email : 2 à 4 courts paragraphes, salutation et formule de politesse sur leurs
+  propres lignes, consigne de relecture orthographique.
+- Consigne générale : REVORA est l'outil interne du SDR, jamais présenté au prospect comme le
+  produit vendu (défaut observé lors d'un essai réel, puis vérifié corrigé).
+
+### Vérifié en réel (Gemini, données de démo, lecture seule)
+- Français / Formal avec signature : vouvoiement, 3 paragraphes, signature appliquée, sans coquille.
+- English / Friendly sans signature : « [Your name] » conservé.
+- Après correction : « REVORA » n'apparaît plus dans les brouillons.
+
+### Tests
+- 341 tests (5 nouveaux : style par défaut, consignes, style limité aux emails, style transmis
+  depuis la fiche, enregistrement depuis Settings).
+
 ## [0.27.0] — 2026-11-15 — Phase 10.2 : chat AI Copilot sur toute la base
 
 ### Ajouté

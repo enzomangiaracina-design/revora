@@ -79,7 +79,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.27.0")
+st.sidebar.caption("VERSION 0.28.0")
 
 # ==========================================
 # 4. PAGE CHOISIE

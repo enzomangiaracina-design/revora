@@ -164,6 +164,26 @@ def render(ctx):
         help="Off by default. Requires an API key for the selected provider in the .env file.",
     )
 
+    # Style des brouillons d'email (utilisé par « Draft a follow-up email »)
+    style = ai_email_style(get_setting(AI_EMAIL_STYLE_SETTING))
+
+    with st.form("ai_email_style_form"):
+        st.markdown("**Email drafts**")
+        col_lang, col_tone, col_sign = st.columns([1, 1, 2])
+        language = col_lang.selectbox("Language", AI_EMAIL_LANGUAGES,
+                                      index=AI_EMAIL_LANGUAGES.index(style["language"]),
+                                      help="Auto: the language of the latest exchanges with the prospect.")
+        tone = col_tone.selectbox("Tone", AI_EMAIL_TONES, index=AI_EMAIL_TONES.index(style["tone"]),
+                                  help="Formal always uses « vous » in French.")
+        signature = col_sign.text_input("Signature", value=style["signature"],
+                                        placeholder="Example: Léa Martin — SDR, Acme")
+
+        if st.form_submit_button("Save email style"):
+            set_setting(AI_EMAIL_STYLE_SETTING,
+                        {"language": language, "tone": tone, "signature": signature.strip()})
+            st.session_state["flash"] = "Email style saved."
+            st.rerun()
+
     # ---------- INTEGRATIONS ----------
 
     st.divider()

@@ -169,6 +169,10 @@ from core.copilot_service import (
     validate_output as ai_validate_output,
     source_labels as ai_source_labels,
     estimate_cost as ai_estimate_cost,
+    SETTING_EMAIL_STYLE as AI_EMAIL_STYLE_SETTING,
+    EMAIL_LANGUAGES as AI_EMAIL_LANGUAGES,
+    EMAIL_TONES as AI_EMAIL_TONES,
+    email_style as ai_email_style,
 )
 
 from database import get_setting, set_setting
