@@ -1,5 +1,28 @@
 # CHANGELOG — REVORA
 
+## [0.26.1] — 2026-11-15 — Gemini : plus d'attente sans fin, premier essai réel réussi
+
+### Corrigé
+- La génération pouvait « tourner » plusieurs minutes : `gemini-3.8-flash` répondait **503**
+  (« high demand ») puis **504**, et le kit Google relançait longtemps en silence.
+  Désormais : délai maximum de 45 s par modèle, aucune relance automatique du kit, et repli
+  immédiat sur l'autre modèle en cas de surcharge (500, 502, 503, 504). Délai dépassé ou réseau
+  coupé → message clair au lieu d'une attente.
+
+### Modifié
+- Modèle principal Gemini : **`gemini-3.5-flash-lite`** (rapide, disponible, gratuit) ;
+  `gemini-3.8-flash` devient le modèle de repli.
+
+### Vérifié en réel (clé de l'utilisateur, données de démo Thomas Martins, lecture seule)
+- « Prepare my call » : 1,4 s, 469 / 243 jetons, 2 faits tous sourcés, 1 hypothèse,
+  4 questions, aucun élément écarté.
+- « Draft a follow-up email » : 2,0 s, 472 / 175 jetons, sources réelles, aucun élément écarté.
+  Défauts observés : une coquille (« je me perm »), tutoiement choisi par le modèle — relecture
+  par le commercial indispensable (le brouillon n'est jamais envoyé automatiquement).
+
+### Tests
+- 328 tests (3 nouveaux : repli en cas de surcharge, surcharge partout, délai dépassé).
+
 ## [0.26.0] — 2026-11-15 — AI Copilot : Google Gemini en fournisseur alternatif
 
 ### Ajouté

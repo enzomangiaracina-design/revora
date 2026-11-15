@@ -22,7 +22,13 @@ import json
 from ai.claude_client import CopilotError
 from integrations.config import get_secret
 
-MODEL = "gemini-3.8-flash"     # disponible sur l'offre gratuite d'après la page tarifs
+# Essais réels du 15/11/2026 : gemini-3.8-flash renvoyait 503 / 504 (surcharge)
+# alors que gemini-3.5-flash-lite répondait en ~1,5 s avec un brief correct.
+# Les deux sont gratuits sur l'offre gratuite d'après la page tarifs officielle.
+MODEL = "gemini-3.5-flash-lite"      # principal : rapide et disponible
+FALLBACK_MODEL = "gemini-3.8-flash"  # repli si le principal est surchargé
+TIMEOUT_MS = 45_000                  # au-delà, on abandonne ce modèle (pas d'attente sans fin)
+OVERLOADED = (500, 502, 503, 504)
 API_KEY_NAME = "GEMINI_API_KEY"
 LABEL = "Google Gemini"
 PRICES = None            # offre gratuite : pas de coût affiché
@@ -37,8 +43,26 @@ def is_configured():
 
 def _default_client():
     from google import genai
+    from google.genai import types
 
-    return genai.Client(api_key=get_secret(API_KEY_NAME))
+    # Délai maximum et aucune relance automatique du kit (il relançait longtemps
+    # quand le modèle était surchargé et la page semblait bloquée) : c'est
+    # REVORA qui passe au modèle de repli.
+    return genai.Client(
+        api_key=get_secret(API_KEY_NAME),
+        http_options=types.HttpOptions(timeout=TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=1)),
+    )
+
+
+def _call(client, model, prompt, config):
+    from google.genai import errors
+
+    try:
+        return client.models.generate_content(model=model, contents=prompt, config=config)
+    except errors.APIError:
+        raise
+    except Exception as error:                   # délai dépassé, réseau coupé…
+        raise CopilotError(f"Gemini did not answer ({type(error).__name__}). Check your connection and try again.")
 
 
 def generate(system, prompt, schema, client=None):
@@ -58,7 +82,13 @@ def generate(system, prompt, schema, client=None):
     )
 
     try:
-        response = client.models.generate_content(model=MODEL, contents=prompt, config=config)
+        try:
+            response = _call(client, MODEL, prompt, config)
+        except errors.ServerError as error:
+            if error.code not in OVERLOADED:
+                raise
+            # Modèle principal surchargé : un essai sur le modèle léger
+            response = _call(client, FALLBACK_MODEL, prompt, config)
     except errors.ClientError as error:
         if error.code in (401, 403):
             raise CopilotError(f"The Gemini API key was rejected. Check {API_KEY_NAME} in the .env file.")
@@ -66,7 +96,7 @@ def generate(system, prompt, schema, client=None):
             raise CopilotError("Gemini free-tier limit reached. Wait a minute (or until tomorrow) and try again.")
         raise CopilotError(f"The request was refused by Gemini: {error.message}")
     except errors.ServerError as error:
-        raise CopilotError(f"Gemini returned an error ({error.code}). Try again later.")
+        raise CopilotError(f"Gemini is overloaded or unavailable ({error.code}). Try again in a few minutes.")
     except errors.APIError as error:
         raise CopilotError(f"Gemini error: {error.message}")
 

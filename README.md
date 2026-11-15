@@ -44,7 +44,7 @@ Deux fournisseurs au choix (Settings › AI features › AI provider) :
 | Fournisseur | Clé dans `.env` | Coût | Données |
 |---|---|---|---|
 | Anthropic Claude (`claude-opus-5-5`) | `ANTHROPIC_API_KEY` (console.anthropic.com) | quelques centimes par génération | non utilisées pour l'entraînement |
-| Google Gemini (`gemini-3.8-flash`) | `GEMINI_API_KEY` (aistudio.google.com) | offre gratuite, quotas limités | **offre gratuite : utilisées par Google pour améliorer ses produits** |
+| Google Gemini (`gemini-3.5-flash-lite`, repli `gemini-3.8-flash`) | `GEMINI_API_KEY` (aistudio.google.com) | offre gratuite, quotas limités | **offre gratuite : utilisées par Google pour améliorer ses produits** |
 
 1. Créez la clé du fournisseur choisi (fixez une limite de dépense pour Claude).
 2. Ajoutez-la dans `.env` (jamais dans le code ni dans `.env.example`).
