@@ -14,7 +14,7 @@ from screens.common import *  # noqa: F401,F403
 from screens.shared import *  # noqa: F401,F403
 
 from core.timeline_service import KINDS as TIMELINE_KINDS, build_timeline, filter_timeline
-from database import get_stage_changes
+from database import get_interaction, get_stage_changes
 
 TIMELINE_ICONS = {
     "Call": ":material/call:", "Email": ":material/mail:", "LinkedIn": ":material/work:",
@@ -43,10 +43,44 @@ def log_interaction_dialog(contact_id):
         ok, message = log_interaction(contact_id, data)
 
         if ok:
+            reset_form(f"dialog_interaction_{contact_id}")
             st.session_state["flash"] = message
             st.rerun()
         else:
             st.error(message)
+
+
+@st.dialog("Edit interaction", width="large")
+def edit_interaction_dialog(interaction_id):
+    """Corriger ou supprimer une interaction saisie à la main."""
+
+    interaction = get_interaction(interaction_id)
+
+    if not interaction:
+        st.error("This interaction no longer exists.")
+        return
+
+    form_key = f"dialog_edit_interaction_{interaction_id}"
+    submitted, _, data = interaction_form(form_key, defaults=interaction)
+
+    if submitted:
+        ok, message = edit_interaction(interaction_id, data)
+
+        if ok:
+            reset_form(form_key)
+            st.session_state["flash"] = message
+            st.rerun()
+        else:
+            st.error(message)
+
+    with st.expander("Delete this interaction", icon=":material/delete:"):
+        st.caption("Use this only for an interaction logged by mistake. Objections noted during it are kept.")
+        sure = st.checkbox("I understand this cannot be undone", key=f"confirm_delete_interaction_{interaction_id}")
+
+        if st.button("Delete interaction", disabled=not sure, key=f"delete_interaction_{interaction_id}"):
+            ok, message = remove_interaction(interaction_id)
+            st.session_state["flash"] = message if ok else f"Error: {message}"
+            st.rerun()
 
 
 @st.dialog("Schedule a follow-up")
@@ -278,7 +312,15 @@ def render(ctx):
             icon = TIMELINE_ICONS.get(event.get("channel") or event["kind"], ":material/history:")
 
             with st.container(border=True):
-                st.markdown(f"{icon} **{event['title']}**")
+                if event.get("editable") and event.get("interaction_id"):
+                    col_title, col_edit = st.columns([6, 1], vertical_alignment="center")
+                    col_title.markdown(f"{icon} **{event['title']}**")
+                    if col_edit.button("", icon=":material/edit:", type="tertiary",
+                                       key=f"edit_interaction_{event['interaction_id']}",
+                                       help="Edit or delete this interaction"):
+                        edit_interaction_dialog(event["interaction_id"])
+                else:
+                    st.markdown(f"{icon} **{event['title']}**")
                 st.caption(" · ".join(part for part in (
                     event["at"], event["meta"],
                     event["source"] if event["source"] not in ("Manual", "REVORA") else "",

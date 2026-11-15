@@ -159,6 +159,7 @@ def render(ctx):
                 ok, message = log_interaction(contact_id, data)
 
                 if ok:
+                    reset_form("log_activity_form")   # formulaire neuf ; en cas d'erreur la saisie reste
                     st.session_state["flash"] = message
                     st.rerun()
                 else:

@@ -276,3 +276,44 @@ def test_stage_definition_edited_in_stages_view(temp_db):
 
     assert database.get_stages()[0]["definition"] == "Jamais contacté"
     assert not at.exception
+
+
+# ---------- Formulaire d'interaction : la saisie reste en cas d'erreur ----------
+
+def _log_form(at):
+    form = next(w.form_id for w in at.text_input if (w.form_id or "").startswith("log_activity_form_"))
+    return form, {w.label: w for w in at.text_input if w.form_id == form}
+
+
+def test_interaction_form_keeps_input_on_error_and_clears_on_success(focus_data):
+    at = open_page("Activity")
+    at.tabs  # onglets rendus
+    form, fields = _log_form(at)
+    fields["Next step"].set_value("Rappeler mardi")
+    [b for b in at.button if b.label == "Save interaction"][0].click().run()
+
+    # Erreur (ni objet ni note) : le champ saisi est toujours là
+    assert any("objet ou une note" in e.value for e in at.error)
+    assert _log_form(at)[1]["Next step"].value == "Rappeler mardi"
+
+    _log_form(at)[1]["Subject"].set_value("Premier appel")
+    [b for b in at.button if b.label == "Save interaction"][0].click().run()
+
+    assert not at.exception
+    new_form, fields = _log_form(at)
+    assert new_form != form and fields["Subject"].value == ""          # formulaire neuf après succès
+    assert len(database.get_all_interactions()) == 1
+
+
+def test_timeline_shows_edit_only_for_manual_interactions(focus_data):
+    paul = focus_data["Paul"]
+    manual = database.add_interaction(paul, "Call", "Outbound", "Completed", "Appel", "", "")
+    database.add_external_interaction(paul, "gmail", "m-9", "Email", "Inbound", "Completed",
+                                      "2026-11-14 09:00:00", subject="Synced")
+    synced = next(i["id"] for i in database.get_interactions(paul) if i["provider"] == "gmail")
+
+    at = open_file(paul)
+    keys = {b.key for b in at.button}
+
+    assert f"edit_interaction_{manual}" in keys
+    assert f"edit_interaction_{synced}" not in keys

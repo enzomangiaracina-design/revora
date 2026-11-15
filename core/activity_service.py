@@ -49,6 +49,55 @@ PERIODS = ["Today", "Last 7 days", "Last 30 days", "All time"]
 # ENREGISTREMENT D'UNE INTERACTION
 # ==========================================
 
+def _validate(data, now):
+    """Vérifie une saisie d'interaction. Retourne (message d'erreur ou None, valeurs nettoyées).
+
+    Partagée par l'enregistrement et la correction : les mêmes règles s'appliquent.
+    """
+
+    subject = (data.get("subject") or "").strip()
+    content = (data.get("content") or "").strip()
+    outcome = (data.get("outcome") or "").strip()
+    occurred_at = data.get("occurred_at") or now
+    follow_up_date = data.get("follow_up_date")
+
+    if data.get("channel") not in CHANNELS:
+        return "Type d'interaction inconnu.", None
+
+    event_type = data.get("event_type") or "Other"
+    direction = data.get("direction")
+
+    if event_type in LINKEDIN_RESULTS:
+        if data["channel"] != "LinkedIn":
+            return f"« {event_type} » n'existe que pour le type LinkedIn.", None
+
+        direction = LINKEDIN_RESULTS[event_type]
+        # Une action LinkedIn se suffit à elle-même : l'objet est facultatif
+        subject = subject or event_type
+
+    if not subject and not content:
+        return "Saisissez un objet ou une note.", None
+
+    # Une marge d'une minute couvre l'écart entre l'heure affichée et le clic
+    if occurred_at > now + timedelta(minutes=1):
+        return "La date de l'interaction ne peut pas être dans le futur.", None
+
+    if follow_up_date and follow_up_date < occurred_at.date():
+        return "La date de relance doit être postérieure à l'interaction.", None
+
+    metadata = {}
+    duration = data.get("duration_minutes") or 0
+
+    if data["channel"] == "Call" and duration > 0:
+        metadata["duration_seconds"] = int(duration * 60)
+
+    return None, {
+        "channel": data["channel"], "direction": direction, "event_type": event_type,
+        "subject": subject, "content": content, "outcome": outcome,
+        "occurred_at": occurred_at.strftime("%Y-%m-%d %H:%M:%S"), "metadata": metadata or None,
+    }
+
+
 def log_interaction(contact_id, data, now=None):
     """Valide puis enregistre une interaction, et crée la relance si demandée.
 
@@ -61,53 +110,21 @@ def log_interaction(contact_id, data, now=None):
     """
 
     now = now or datetime.now()
+    error, clean = _validate(data, now)
 
-    subject = (data.get("subject") or "").strip()
-    content = (data.get("content") or "").strip()
-    outcome = (data.get("outcome") or "").strip()
-    occurred_at = data.get("occurred_at") or now
-    follow_up_date = data.get("follow_up_date")
-
-    if data.get("channel") not in CHANNELS:
-        return False, "Type d'interaction inconnu."
-
-    event_type = data.get("event_type") or "Other"
-    direction = data.get("direction")
-
-    if event_type in LINKEDIN_RESULTS:
-        if data["channel"] != "LinkedIn":
-            return False, f"« {event_type} » n'existe que pour le type LinkedIn."
-
-        direction = LINKEDIN_RESULTS[event_type]
-        # Une action LinkedIn se suffit à elle-même : l'objet est facultatif
-        subject = subject or event_type
-
-    if not subject and not content:
-        return False, "Saisissez un objet ou une note."
-
-    # Une marge d'une minute couvre l'écart entre l'heure affichée et le clic
-    if occurred_at > now + timedelta(minutes=1):
-        return False, "La date de l'interaction ne peut pas être dans le futur."
-
-    if follow_up_date and follow_up_date < occurred_at.date():
-        return False, "La date de relance doit être postérieure à l'interaction."
-
-    metadata = {}
-    duration = data.get("duration_minutes") or 0
-
-    if data["channel"] == "Call" and duration > 0:
-        metadata["duration_seconds"] = int(duration * 60)
+    if error:
+        return False, error
 
     interaction_id = database.add_interaction(
         contact_id,
-        data["channel"],
-        direction,
-        event_type,
-        subject,
-        content,
-        outcome,
-        occurred_at=occurred_at.strftime("%Y-%m-%d %H:%M:%S"),
-        metadata=metadata or None,
+        clean["channel"],
+        clean["direction"],
+        clean["event_type"],
+        clean["subject"],
+        clean["content"],
+        clean["outcome"],
+        occurred_at=clean["occurred_at"],
+        metadata=clean["metadata"],
     )
 
     done = ["Interaction enregistrée"]
@@ -120,16 +137,65 @@ def log_interaction(contact_id, data, now=None):
             objection,
             verbatim=data.get("objection_verbatim"),
             interaction_id=interaction_id,
-            occurred_at=occurred_at.strftime("%Y-%m-%d %H:%M:%S"),
+            occurred_at=clean["occurred_at"],
         )
         done.append(f"objection « {objection} » notée")
 
+    follow_up_date = data.get("follow_up_date")
+
     if follow_up_date:
-        title = outcome or f"Follow up after {data['channel'].lower()}"
-        database.create_task(contact_id, title, content, follow_up_date.isoformat())
+        title = clean["outcome"] or f"Follow up after {data['channel'].lower()}"
+        database.create_task(contact_id, title, clean["content"], follow_up_date.isoformat())
         done.append("relance planifiée")
 
     return True, ", ".join(done) + "."
+
+
+def is_editable(interaction):
+    """Une interaction se corrige seulement si elle a été saisie à la main."""
+
+    return interaction.get("provider") in (None, "manual")
+
+
+def edit_interaction(interaction_id, data, now=None):
+    """Corrige une interaction saisie à la main (mêmes règles qu'à la saisie). Retourne (succès, message)."""
+
+    current = database.get_interaction(interaction_id)
+
+    if not current:
+        return False, "Interaction introuvable."
+
+    if not is_editable(current):
+        return False, f"Cette interaction vient de {source_label(current['provider'])} : corrigez-la à la source."
+
+    error, clean = _validate(data, now or datetime.now())
+
+    if error:
+        return False, error
+
+    database.update_interaction(interaction_id, **clean)
+
+    return True, "Interaction corrigée."
+
+
+def remove_interaction(interaction_id):
+    """Supprime une interaction saisie par erreur. Retourne (succès, message)."""
+
+    current = database.get_interaction(interaction_id)
+
+    if not current:
+        return False, "Interaction introuvable."
+
+    if not is_editable(current):
+        return False, f"Cette interaction vient de {source_label(current['provider'])} : elle ne peut pas être supprimée ici."
+
+    result = database.delete_interaction(interaction_id)
+    message = "Interaction supprimée."
+
+    if result["objections_unlinked"]:
+        message += f" {result['objections_unlinked']} objection(s) conservée(s), sans lien vers cet échange."
+
+    return True, message
 
 
 # ==========================================

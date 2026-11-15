@@ -228,3 +228,52 @@ def test_sync_status_from_database(temp_db):
 
     gmail = sync_status(database.get_integrations())[1]
     assert (gmail["state"], gmail["text"]) == ("error", "error: Token expired (never synced)")
+
+
+# ---------- Correction et suppression d'une interaction ----------
+
+def test_edit_interaction_applies_the_same_rules(thomas):
+    service.log_interaction(thomas, make(), now=NOW)
+    interaction_id = database.get_interactions(thomas)[0]["id"]
+
+    ok, _ = service.edit_interaction(
+        interaction_id, make(event_type="Completed", subject="Appel corrigé", duration_minutes=4,
+                             occurred_at=datetime(2026, 11, 13, 16, 30)), now=NOW)
+
+    saved = database.get_interaction(interaction_id)
+    assert ok
+    assert (saved["event_type"], saved["subject"], saved["occurred_at_local"]) == (
+        "Completed", "Appel corrigé", "2026-11-13 16:30:00")
+    assert saved["metadata"] == {"duration_seconds": 240}
+
+    ok, message = service.edit_interaction(interaction_id, make(subject="", content=""), now=NOW)
+    assert not ok and message == "Saisissez un objet ou une note."
+    assert database.get_interaction(interaction_id)["subject"] == "Appel corrigé"   # inchangée
+
+
+def test_synced_interaction_cannot_be_edited_or_deleted(thomas):
+    database.add_external_interaction(thomas, "gmail", "m-1", "Email", "Inbound", "Completed",
+                                      "2026-11-14 09:00:00", subject="Re: offre")
+    interaction_id = database.get_interactions(thomas)[0]["id"]
+
+    assert service.edit_interaction(interaction_id, make(), now=NOW)[0] is False
+    ok, message = service.remove_interaction(interaction_id)
+    assert not ok and "Gmail" in message
+    assert database.get_interaction(interaction_id) is not None
+
+
+def test_delete_interaction_keeps_its_objections(thomas):
+    service.log_interaction(thomas, make(objection_category="No budget"), now=NOW)
+    interaction_id = database.get_interactions(thomas)[0]["id"]
+
+    ok, message = service.remove_interaction(interaction_id)
+
+    assert ok and "1 objection(s) conservée(s)" in message
+    assert database.get_interactions(thomas) == []
+    objection = database.get_objections(thomas)[0]
+    assert (objection["category"], objection["interaction_id"]) == ("No budget", None)
+
+
+def test_unknown_interaction(thomas):
+    assert service.remove_interaction(9999) == (False, "Interaction introuvable.")
+    assert service.edit_interaction(9999, make()) == (False, "Interaction introuvable.")

@@ -4,6 +4,35 @@ from screens.common import *  # noqa: F401,F403
 from screens.shared import *  # noqa: F401,F403
 
 
+def _save_log_edits(editor_key, ids):
+    """Enregistre les corrections du journal (callback du tableau).
+
+    Concept : un callback s'exécute AVANT le script. Le message « flash » est
+    donc affiché dans ce même passage ; puis le tableau reçoit une nouvelle
+    clé (version) pour repartir des données à jour, sans relance supplémentaire
+    qui effacerait le message.
+    """
+
+    edited_rows = (st.session_state.get(editor_key) or {}).get("edited_rows", {})
+    saved = 0
+
+    for row, changes in edited_rows.items():
+        objection_id = int(ids[int(row)])
+
+        if "Status" in changes:
+            set_objection_status(objection_id, changes["Status"])
+            saved += 1
+
+        if "Category" in changes:
+            ok, _ = change_objection_category(objection_id, changes["Category"])
+            saved += ok
+
+    if saved:
+        st.session_state["flash"] = f"{saved} objection change(s) saved."
+
+    st.session_state["objections_log_version"] = st.session_state.get("objections_log_version", 0) + 1
+
+
 def render(ctx):
     """Affiche la page « Objections »."""
 
@@ -176,7 +205,10 @@ def render(ctx):
             st.caption("Category and status can be corrected directly in the table.")
 
             editable = ["Category", "Status"]
-            edited = st.data_editor(
+            version = st.session_state.get("objections_log_version", 0)
+            editor_key = f"objections_log_editor_{version}"
+
+            st.data_editor(
                 log,
                 column_config={
                     "id": None,
@@ -187,22 +219,6 @@ def render(ctx):
                 disabled=[c for c in log.columns if c not in editable],
                 hide_index=True,
                 width="stretch",
-                key="objections_log_editor",
+                key=editor_key,
+                on_change=_save_log_edits, args=(editor_key, log["id"].tolist()),
             )
-
-            changes = [
-                (int(row["id"]), column, row[column])
-                for (_, row), (_, before) in zip(edited.iterrows(), log.iterrows())
-                for column in editable
-                if row[column] != before[column]
-            ]
-
-            if changes:
-                for objection_id, column, value in changes:
-                    if column == "Status":
-                        set_objection_status(objection_id, value)
-                    else:
-                        change_objection_category(objection_id, value)
-                st.session_state.pop("objections_log_editor", None)
-                st.session_state["flash"] = f"{len(changes)} objection change(s) saved."
-                st.rerun()

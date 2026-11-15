@@ -34,6 +34,8 @@ from core.activity_service import (
     PERIODS,
     TASK_OPEN,
     log_interaction,
+    edit_interaction,
+    remove_interaction,
     group_tasks,
     period_bounds,
     count_by_channel,

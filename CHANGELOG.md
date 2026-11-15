@@ -1,5 +1,32 @@
 # CHANGELOG — REVORA
 
+## [0.23.0] — 2026-11-15 — Corriger les saisies
+
+### Ajouté
+- **Modifier ou supprimer une interaction** depuis la timeline de la fiche prospect (icône ✏️) :
+  formulaire pré-rempli, mêmes règles de validation qu'à la saisie, score recalculé.
+  Suppression protégée par une case « I understand this cannot be undone ».
+  - Seules les saisies **manuelles** sont modifiables : une interaction HubSpot ou Gmail appartient
+    à sa source (elle serait recréée à la synchronisation suivante) — pas d'icône ✏️, refus côté service.
+  - Les objections notées pendant l'échange supprimé sont **conservées** (elles ont été réellement
+    exprimées) ; elles perdent seulement leur lien vers l'échange.
+- `database` : `get_interaction`, `update_interaction`, `delete_interaction` (transaction) ;
+  `activity_service` : `edit_interaction`, `remove_interaction`, `is_editable`.
+
+### Corrigé
+- Le formulaire d'interaction (page Activity et fiche prospect) **garde la saisie en cas d'erreur** ;
+  il n'est vidé qu'après un enregistrement réussi (`clear_on_submit=False` + `reset_form`).
+- Objections › Log : le message de confirmation s'affiche enfin après une correction
+  (enregistrement dans un callback du tableau, sans relance supplémentaire qui l'effaçait).
+
+### Modifié
+- `activity_service._validate` : règles de validation partagées par la saisie et la correction.
+
+### Tests
+- 302 tests (6 nouveaux). Vérifié dans le navigateur sur une **copie** de la base : correction d'un
+  appel (score 0 → 9), suppression (objection conservée, score revenu à 0), message du journal des
+  objections. `revora.db` n'a pas été modifiée.
+
 ## [0.22.0] — 2026-11-15 — P2.4 : Pipeline, définitions et confirmation des étapes fermées
 
 ### Ajouté

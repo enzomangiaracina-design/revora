@@ -26,6 +26,9 @@ def _interaction_event(item, format_duration):
         "detail": detail,
         "meta": " · ".join(meta),
         "source": SOURCE_LABELS.get(item.get("provider"), item.get("provider") or "Manual"),
+        # Pour corriger / supprimer depuis la fiche (saisies manuelles uniquement)
+        "interaction_id": item.get("id"),
+        "editable": item.get("provider") in (None, "manual"),
     }
 
 

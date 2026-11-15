@@ -1610,6 +1610,84 @@ def add_interaction(
         connection.close()
 
 
+# Seules les saisies manuelles sont modifiables : une interaction synchronisee
+# (HubSpot, Gmail) appartient a sa source et serait recreee a la synchro suivante.
+_MANUAL = "(provider = 'manual' OR provider IS NULL)"
+
+
+def get_interaction(interaction_id):
+    """Une interaction (avec son heure locale), ou None."""
+
+    connection = get_connection()
+    row = connection.execute(
+        "SELECT *, datetime(occurred_at, 'localtime') AS occurred_at_local FROM interactions WHERE id = ?",
+        (interaction_id,)
+    ).fetchone()
+    connection.close()
+
+    return _with_metadata(row) if row else None
+
+
+def update_interaction(interaction_id, channel, direction, event_type, subject, content, outcome,
+                       occurred_at, metadata=None):
+    """Corrige une interaction saisie a la main. Retourne True si elle a ete modifiee.
+
+    occurred_at : date et heure LOCALES ("AAAA-MM-JJ HH:MM:SS").
+    """
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute(
+            f"""
+            UPDATE interactions
+            SET channel = ?, direction = ?, event_type = ?, subject = ?, content = ?,
+                outcome = ?, occurred_at = datetime(?, 'utc'), metadata = ?
+            WHERE id = ? AND {_MANUAL}
+            """,
+            (channel, direction, event_type, subject, content, outcome, occurred_at,
+             json.dumps(metadata) if metadata else None, interaction_id)
+        )
+        connection.commit()
+
+        return cursor.rowcount == 1
+
+    finally:
+        connection.close()
+
+
+def delete_interaction(interaction_id):
+    """Supprime une interaction saisie par erreur (saisie manuelle uniquement).
+
+    Les objections notees pendant cet echange sont CONSERVEES (elles ont ete
+    reellement exprimees) : elles perdent seulement leur lien vers l'echange.
+    Retourne {"deleted": bool, "objections_unlinked": n}.
+    """
+
+    connection = get_connection()
+
+    try:
+        if not connection.execute(
+            f"SELECT 1 FROM interactions WHERE id = ? AND {_MANUAL}", (interaction_id,)
+        ).fetchone():
+            return {"deleted": False, "objections_unlinked": 0}
+
+        unlinked = connection.execute(
+            "UPDATE objections SET interaction_id = NULL WHERE interaction_id = ?", (interaction_id,)
+        ).rowcount
+        connection.execute("DELETE FROM interactions WHERE id = ?", (interaction_id,))
+        connection.commit()
+
+        return {"deleted": True, "objections_unlinked": unlinked}
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
 # ==========================================
 # 7. HISTORIQUE DES INTERACTIONS
 # ==========================================

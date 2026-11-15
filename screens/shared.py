@@ -120,17 +120,30 @@ def prospect_form(form_key, verticals, submit_label, defaults=None):
     return submitted, data
 
 
-def interaction_form(form_key, prospect_options=None):
-    """Formulaire d'enregistrement d'une interaction.
+def interaction_form(form_key, prospect_options=None, defaults=None):
+    """Formulaire d'enregistrement (ou de correction) d'une interaction.
 
     prospect_options : {libelle: contact_id}. S'il est fourni, le formulaire
     propose de choisir le prospect (page Activity) ; sinon le prospect est
     deja connu (fiche prospect).
+    defaults : interaction existante a corriger. Les champs « relance » et
+    « objection » sont alors masques (ils creent d'autres elements).
+
+    Concept : le formulaire n'est PAS vide automatiquement a l'envoi
+    (clear_on_submit=False). En cas d'erreur, la saisie reste la pour etre
+    corrigee ; apres un succes, l'appelant appelle reset_form(form_key).
 
     Retourne (bouton_clique, contact_id ou None, donnees_saisies).
     """
 
-    with st.form(form_key, clear_on_submit=True):
+    defaults = defaults or {}
+    editing = bool(defaults)
+    version = st.session_state.get(f"_form_version_{form_key}", 0)
+
+    def pick(options, value):
+        return options.index(value) if value in options else 0
+
+    with st.form(f"{form_key}_{version}", clear_on_submit=False):
 
         contact_label = None
 
@@ -139,56 +152,63 @@ def interaction_form(form_key, prospect_options=None):
 
         col1, col2, col3 = st.columns(3)
 
-        channel = col1.selectbox("Interaction type", CHANNELS)
-        direction = col2.selectbox("Direction", DIRECTIONS)
+        channel = col1.selectbox("Interaction type", CHANNELS, index=pick(CHANNELS, defaults.get("channel")))
+        direction = col2.selectbox("Direction", DIRECTIONS, index=pick(DIRECTIONS, defaults.get("direction")))
         event_type = col3.selectbox(
-            "Result", RESULTS,
+            "Result", RESULTS, index=pick(RESULTS, defaults.get("event_type")),
             help="LinkedIn actions (connection request, accepted, InMail) require the LinkedIn type; "
                  "their direction is set automatically.",
         )
 
+        when = datetime.fromisoformat(defaults["occurred_at_local"]) if defaults.get("occurred_at_local") else None
+        seconds = (defaults.get("metadata") or {}).get("duration_seconds") or 0
+
         col1, col2, col3 = st.columns(3)
 
-        day = col1.date_input("Date", value="today", max_value=date.today())
-        time = col2.time_input("Time", value="now")
+        day = col1.date_input("Date", value=when.date() if when else "today", max_value=date.today())
+        time = col2.time_input("Time", value=when.time() if when else "now")
         duration = col3.number_input(
-            "Call duration (minutes)", min_value=0.0, step=1.0,
+            "Call duration (minutes)", min_value=0.0, step=1.0, value=round(seconds / 60, 1),
             help="Calls only. Leave 0 if unknown."
         )
 
-        subject = st.text_input("Subject")
+        subject = st.text_input("Subject", value=defaults.get("subject") or "")
 
         content = st.text_area(
-            "Notes / interaction details",
+            "Notes / interaction details", value=defaults.get("content") or "",
             placeholder="What happened during this interaction?"
         )
 
         col1, col2 = st.columns(2)
 
         outcome = col1.text_input(
-            "Next step",
+            "Next step", value=defaults.get("outcome") or "",
             placeholder="Example: Call back next Tuesday"
         )
-        follow_up_date = col2.date_input(
-            "Follow-up date (optional)", value=None,
-            help="Creates a follow-up task with the next step as title."
-        )
 
-        col1, col2 = st.columns(2)
+        follow_up_date = objection_category = objection_verbatim = None
 
-        objection_category = col1.selectbox(
-            "Objection raised (optional)",
-            objection_categories(get_objections()),
-            index=None,
-            accept_new_options=True,
-            placeholder="None — only if the prospect actually said it",
-        )
-        objection_verbatim = col2.text_input(
-            "Objection wording (optional)",
-            placeholder="What the prospect said, in their words",
-        )
+        if not editing:
+            follow_up_date = col2.date_input(
+                "Follow-up date (optional)", value=None,
+                help="Creates a follow-up task with the next step as title."
+            )
 
-        submitted = st.form_submit_button("Save interaction", width="stretch")
+            col1, col2 = st.columns(2)
+
+            objection_category = col1.selectbox(
+                "Objection raised (optional)",
+                objection_categories(get_objections()),
+                index=None,
+                accept_new_options=True,
+                placeholder="None — only if the prospect actually said it",
+            )
+            objection_verbatim = col2.text_input(
+                "Objection wording (optional)",
+                placeholder="What the prospect said, in their words",
+            )
+
+        submitted = st.form_submit_button("Save changes" if editing else "Save interaction", width="stretch")
 
     data = {
         "channel": channel,

@@ -27,7 +27,8 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ✅ Relances : création (aussi depuis une interaction), classement par échéance, validation
 - ✅ Compteurs automatiques (fiche prospect, liste, indicateurs du jour)
 - ✅ Heures affichées en heure locale
-- ⬜ Plus tard : modifier / supprimer une interaction saisie par erreur, synchronisation automatique (phases 6-7)
+- ✅ Modifier / supprimer une interaction saisie à la main (v0.23.0)
+- ⬜ Plus tard : synchronisation automatique (phases 6-7)
 
 ## Phase 4 — Pipeline ✅
 - ✅ Kanban avec changement d'étape depuis la carte
