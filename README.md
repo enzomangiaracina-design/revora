@@ -52,6 +52,24 @@ Deux fournisseurs au choix (Settings › AI features › AI provider) :
 
 N'utilisez que des données de démonstration ou de test, sauf autorisation.
 
+## Base de démonstration (fictive)
+
+Pour tester ou faire une démo sans toucher à vos données, créez une base séparée `demo.db`
+(20 prospects fictifs, appels, emails, LinkedIn, objections, relances — emails en `.example`) :
+
+```bash
+python3 seed_demo.py
+```
+
+Lancez ensuite l'application sur cette base (un bandeau « Demo database » s'affiche) :
+
+```bash
+REVORA_DATABASE=demo.db streamlit run main.py
+```
+
+Pour repartir d'une démo neuve (supprime **uniquement** `demo.db`) : `python3 seed_demo.py --reset`.
+Sans `REVORA_DATABASE`, l'application utilise toujours `revora.db`.
+
 ## Lancer les tests
 
 ```bash

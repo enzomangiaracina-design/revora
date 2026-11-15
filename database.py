@@ -9,7 +9,34 @@ from pathlib import Path
 # ==========================================
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE_PATH = BASE_DIR / "revora.db"
+DEFAULT_DATABASE_PATH = BASE_DIR / "revora.db"
+
+
+def _database_path():
+    """Base utilisée : revora.db, sauf si REVORA_DATABASE désigne une autre base.
+
+    Exemple (base de démonstration) : REVORA_DATABASE=demo.db streamlit run main.py
+    Un chemin relatif est compris par rapport au dossier du projet.
+    """
+
+    import os
+
+    override = os.environ.get("REVORA_DATABASE", "").strip()
+
+    if not override:
+        return DEFAULT_DATABASE_PATH
+
+    path = Path(override).expanduser()
+    return path if path.is_absolute() else BASE_DIR / path
+
+
+DATABASE_PATH = _database_path()
+
+
+def is_default_database():
+    """Vrai si l'application travaille sur la base principale revora.db."""
+
+    return Path(DATABASE_PATH).resolve() == DEFAULT_DATABASE_PATH.resolve()
 
 # Etapes de prospection creees au premier lancement d'une NOUVELLE base
 # (modifiables ensuite depuis Pipeline > Stages). Une base existante garde
@@ -970,6 +997,30 @@ def set_stage_definition(stage_id, definition):
     try:
         connection.execute(
             "UPDATE pipeline_stages SET definition = ? WHERE id = ?", (_clean(definition), stage_id)
+        )
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def set_created_at(table, record_id, created_at):
+    """Antidate un enregistrement (base de DÉMONSTRATION uniquement, voir core/demo_data.py).
+
+    created_at : date et heure LOCALES. Seules les tables listées sont acceptées.
+    """
+
+    if table not in ("contacts", "tasks"):
+        raise ValueError(f"Table not allowed: {table}")
+
+    if is_default_database():
+        raise ValueError("Backdating is only allowed outside revora.db.")
+
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            f"UPDATE {table} SET created_at = datetime(?, 'utc') WHERE id = ?", (created_at, record_id)
         )
         connection.commit()
 

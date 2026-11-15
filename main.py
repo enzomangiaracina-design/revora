@@ -11,6 +11,7 @@ Lancement : streamlit run main.py
 import streamlit as st
 
 from core.score_service import refresh_scores
+import database
 from database import get_all_prospects, get_stage_names, initialize_database
 from screens import AppContext
 from screens.shared import close_prospect, error_state
@@ -79,7 +80,11 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.28.0")
+st.sidebar.caption("VERSION 0.29.0")
+
+# Base de démonstration ou autre base choisie avec REVORA_DATABASE : toujours visible
+if not database.is_default_database():
+    st.sidebar.warning(f"Demo database: {database.DATABASE_PATH.name}", icon=":material/science:")
 
 # ==========================================
 # 4. PAGE CHOISIE

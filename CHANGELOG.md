@@ -1,5 +1,26 @@
 # CHANGELOG — REVORA
 
+## [0.29.0] — 2026-11-15 — Base de démonstration fictive
+
+### Ajouté
+- `python3 seed_demo.py` crée **`demo.db`**, une base SÉPARÉE et entièrement fictive :
+  20 prospects (5 verticales, 2 commerciaux), environ 90 échanges sur 45 jours (appels avec durée,
+  emails, LinkedIn, notes en français), objections (ouvertes, traitées, perdues), relances dont
+  certaines en retard, qualification, deux réponses de playbook. Emails en `.example`, numéros
+  factices. Contenu déterministe ; dates calculées à partir d'aujourd'hui.
+  - refuse d'écrire dans `revora.db` ; refuse d'écraser `demo.db` sans `--reset`
+    (qui ne supprime que `demo.db`).
+- Variable `REVORA_DATABASE` : `REVORA_DATABASE=demo.db streamlit run main.py` lance l'application
+  sur une autre base. Sans elle, toujours `revora.db`.
+- Bandeau **« Demo database: demo.db »** dans la barre latérale dès que la base n'est pas `revora.db`.
+- `database.set_created_at` : antidate une fiche ou une relance — réservé aux bases autres que
+  `revora.db` et aux tables `contacts` / `tasks` (pour des dates de démo cohérentes).
+
+### Tests
+- 350 tests (9 nouveaux : base séparée, données fictives et passées, déterminisme, protection de
+  `revora.db`, `--reset`, choix de base, rendu des 8 pages sur la démo, cohérence des dates,
+  garde-fous de l'antidatage). Vérifié dans le navigateur sur `demo.db`. `revora.db` inchangée.
+
 ## [0.28.0] — 2026-11-15 — Style des brouillons d'email
 
 ### Ajouté
