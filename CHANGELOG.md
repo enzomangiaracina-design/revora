@@ -1,5 +1,13 @@
 # CHANGELOG — REVORA
 
+## [Non publié] — 2026-11-15 — Dépôt GitHub
+
+### Ajouté
+- Dépôt distant `origin` : https://github.com/enzomangiaracina-design/revora (public, choix validé).
+- Fusion du commit initial créé par GitHub : notre README est conservé ; le `.gitignore` réunit
+  nos règles et le modèle Python de GitHub (aucun fichier suivi n'est exclu par la fusion).
+- Vérifié avant envoi : ni `.env`, ni `revora.db`, ni `backups/`, ni document externe dans l'historique.
+
 ## [0.18.0] — 2026-11-15 — P1 : Cockpit SDR (Today's Focus enrichi)
 
 ### Ajouté

@@ -83,6 +83,18 @@ git status
 git add -A && git commit -m "Description de la modification"
 ```
 
+Dépôt distant (**public**) : https://github.com/enzomangiaracina-design/revora. Envoyer les commits :
+
+```bash
+git push
+```
+
+Récupérer le projet sur un autre ordinateur :
+
+```bash
+git clone https://github.com/enzomangiaracina-design/revora.git
+```
+
 ## Modules
 
 | Module | État |
