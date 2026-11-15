@@ -1,5 +1,7 @@
 """Page « Prospects »."""
 
+from functools import partial
+
 from screens.common import *  # noqa: F401,F403
 from screens.shared import *  # noqa: F401,F403
 
@@ -97,8 +99,13 @@ def render(ctx):
                         "LinkedIn": st.column_config.LinkColumn("LinkedIn", display_text="Profile"),
                     },
                     width="stretch",
-                    hide_index=True
+                    hide_index=True,
+                    # Clic sur une ligne -> ouverture de la fiche prospect
+                    key=table_key("prospects_table"),
+                    on_select=partial(open_from_table, "prospects_table", [int(i) for i in df["id"]]),
+                    selection_mode="single-row",
                 )
+                st.caption("Select a row to open the prospect file.")
             else:
                 st.info("No prospect matches these filters.")
 
@@ -110,8 +117,15 @@ def render(ctx):
                 for p in prospects
             }
 
-            selected_label = st.selectbox("Prospect to edit", list(edit_options))
+            col_select, col_open = st.columns([5, 1], vertical_alignment="bottom")
+
+            selected_label = col_select.selectbox("Prospect to edit", list(edit_options))
             contact_id = edit_options[selected_label]
+
+            col_open.button(
+                "Open file", icon=":material/open_in_new:", width="stretch",
+                on_click=open_prospect, args=(contact_id,), key="prospects_open_selected",
+            )
             prospect = get_prospect_by_id(contact_id)
 
             # La cle du formulaire inclut l'id : changer de prospect

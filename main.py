@@ -13,6 +13,7 @@ import streamlit as st
 from core.score_service import refresh_scores
 from database import get_all_prospects, get_stage_names, initialize_database
 from screens import AppContext
+from screens.shared import close_prospect
 from screens import overview, prospects, prospect_details, pipeline, activity, objections, copilot, performance, settings
 from ui import theme
 
@@ -50,26 +51,35 @@ theme.apply_theme()
 # 3. NAVIGATION
 # ==========================================
 
+# Ordre du blueprint Produit & UX. La fiche prospect n'est plus une entree de
+# menu : elle s'ouvre depuis les listes, par-dessus la page en cours.
+NAV_PAGES = [
+    "Overview",
+    "Prospects",
+    "Prospecting Pipeline",
+    "Activity",
+    "Objections",
+    "AI Copilot",
+    "Performance",
+    "Settings",
+]
+
+# Session ouverte avant ce changement : "Prospect Details" n'existe plus dans le menu
+if st.session_state.get("nav_page") not in (None, *NAV_PAGES):
+    st.session_state["nav_page"] = "Prospects"
+    st.session_state["prospect_open"] = True
+
 page = st.sidebar.radio(
     "Navigation",
-    [
-        "Overview",
-        "Prospecting Pipeline",
-        "Prospects",
-        "Prospect Details",
-        "Activity",
-        "Objections",
-        "AI Copilot",
-        "Performance",
-        "Settings"
-    ],
+    NAV_PAGES,
     format_func=theme.nav_label,
     label_visibility="collapsed",
-    key="nav_page"
+    key="nav_page",
+    on_change=close_prospect,  # choisir une page dans le menu ferme la fiche ouverte
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.14.1")
+st.sidebar.caption("VERSION 0.15.0")
 
 # ==========================================
 # 4. PAGE CHOISIE
@@ -78,7 +88,6 @@ st.sidebar.caption("VERSION 0.14.1")
 PAGES = {
     "Overview": overview.render,
     "Prospects": prospects.render,
-    "Prospect Details": prospect_details.render,
     "Prospecting Pipeline": pipeline.render,
     "Activity": activity.render,
     "Objections": objections.render,
@@ -87,4 +96,7 @@ PAGES = {
     "Settings": settings.render,
 }
 
-PAGES[page](ctx)
+if st.session_state.get("prospect_open"):
+    prospect_details.render(ctx)
+else:
+    PAGES[page](ctx)

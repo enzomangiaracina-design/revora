@@ -10,7 +10,14 @@ def render(ctx):
     prospects, stage_names, scores = ctx.prospects, ctx.stage_names, ctx.scores
 
 
-    st.title("Prospect Details")
+    origin = theme.NAV_DISPLAY.get(st.session_state.get("nav_page"), st.session_state.get("nav_page") or "Overview")
+
+    st.button(
+        f"Back to {origin}", icon=":material/arrow_back:", type="tertiary",
+        on_click=close_prospect, key="prospect_back",
+    )
+
+    st.title("Prospect file")
     st.caption("Your complete commercial memory.")
 
     show_flash_message()

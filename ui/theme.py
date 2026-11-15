@@ -58,10 +58,14 @@ NAV_ICONS = {
 }
 
 
+# Libellés affichés dans le menu (les noms internes des pages ne changent pas)
+NAV_DISPLAY = {"Prospecting Pipeline": "Pipeline"}
+
+
 def nav_label(page):
     """Libellé de navigation avec son icône."""
 
-    return f"{NAV_ICONS.get(page, '')} {page}".strip()
+    return f"{NAV_ICONS.get(page, '')} {NAV_DISPLAY.get(page, page)}".strip()
 
 
 CSS = f"""

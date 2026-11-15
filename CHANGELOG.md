@@ -1,5 +1,29 @@
 # CHANGELOG — REVORA
 
+## [0.15.0] — 2026-11-15 — P0.2 : navigation du blueprint
+
+### Modifié
+- **Menu dans l'ordre du blueprint** : Overview, Prospects, Pipeline, Activity, Objections, AI Copilot,
+  Performance, Settings (« Prospecting Pipeline » affiché « Pipeline »).
+- **La fiche prospect n'est plus une entrée de menu** : elle s'ouvre par-dessus la page en cours, avec un
+  bouton « Back to <page> ». Choisir une page dans le menu ferme la fiche.
+- Ouverture de la fiche depuis : Overview (focus, recherche, activité récente), Pipeline (cartes),
+  **Prospects (clic sur une ligne du tableau, bouton « Open file »)**.
+- Une session restée sur l'ancienne entrée « Prospect Details » est convertie sans erreur.
+
+### Détail technique
+- `open_prospect` / `close_prospect` / `go_to` dans `screens/shared.py` ; état `prospect_open`.
+- Tableau cliquable : la sélection est remise à zéro après ouverture (clé de tableau versionnée),
+  sinon la fiche se rouvrirait au retour.
+
+### Tests effectués
+- `python3 -m pytest` : 228 tests réussis ; `revora.db` inchangée. Les 8 pages du menu s'affichent sans erreur.
+- Parcours (sur une copie) : Overview → fiche → retour ; fiche ouverte puis menu → fiche fermée ;
+  Prospects « Open file » ; ancienne session « Prospect Details ».
+- Navigateur : clic sur une ligne du tableau → fiche, retour sans réouverture ; carte du Pipeline →
+  fiche avec « Back to Pipeline ».
+- Sauvegarde préalable : `backups/20261115-082426/`. Aucune migration de base.
+
 ## [0.14.1] — 2026-11-15 — P0.1 : découpage de l'interface en pages
 
 Première étape de P0 (blueprint Produit & UX). **Aucun changement de comportement.**

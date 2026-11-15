@@ -229,8 +229,39 @@ def open_prospect(contact_id):
     prospect = get_prospect_by_id(contact_id)
 
     if prospect:
-        st.session_state["nav_page"] = "Prospect Details"
+        # La fiche s'ouvre PAR-DESSUS la page en cours (blueprint : la fiche n'est
+        # pas une entree de menu). La page d'origine reste selectionnee pour le retour.
+        st.session_state["prospect_open"] = True
         st.session_state["details_prospect"] = prospect_label(prospect)
+
+
+def close_prospect():
+    """Ferme la fiche prospect et revient a la page d'origine (callback)."""
+
+    st.session_state["prospect_open"] = False
+
+
+def open_from_table(table_name, ids):
+    """Callback d'un tableau cliquable : ouvre la fiche de la ligne choisie.
+
+    ids : identifiants des prospects, dans l'ordre des lignes du tableau.
+    Apres ouverture, le tableau recoit un nouveau numero de version : sa
+    selection est remise a zero (sinon la fiche se rouvrirait au retour).
+    """
+
+    version_key = f"_table_version_{table_name}"
+    state = st.session_state.get(f"{table_name}_{st.session_state.get(version_key, 0)}")
+    rows = (state or {}).get("selection", {}).get("rows", [])
+
+    if rows and rows[0] < len(ids):
+        open_prospect(ids[rows[0]])
+        st.session_state[version_key] = st.session_state.get(version_key, 0) + 1
+
+
+def table_key(table_name):
+    """Cle actuelle (versionnee) d'un tableau cliquable."""
+
+    return f"{table_name}_{st.session_state.get(f'_table_version_{table_name}', 0)}"
 
 
 def _on_board_move():
@@ -256,6 +287,7 @@ def go_to(page_name, **state):
     """Change de page depuis un bouton (callback), en reglant d'autres widgets si besoin."""
 
     st.session_state["nav_page"] = page_name
+    st.session_state["prospect_open"] = False
 
     for key, value in state.items():
         st.session_state[key] = value
