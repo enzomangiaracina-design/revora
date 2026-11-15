@@ -1,5 +1,33 @@
 # CHANGELOG — REVORA
 
+## [0.16.0] — 2026-11-15 — P0.3 : fiche prospect 360°
+
+### Ajouté
+- **En-tête** : identité, poste, entreprise, verticale ; propriétaire, score, source, lien LinkedIn ;
+  **étape modifiable directement** ; actions principales **Log interaction**, **Follow-up**, **Objection**,
+  **Edit** (fenêtres qui réutilisent les formulaires existants).
+- **Prochaine action toujours visible** (en retard / aujourd'hui), avec bouton « Done ».
+- **Timeline unifiée** (`core/timeline_service.py`) : interactions, relances, objections, changements
+  d'étape, variations de score et création de la fiche, filtrable par type ; source affichée
+  (HubSpot, Gmail) quand l'événement ne vient pas d'une saisie manuelle.
+- **Historique des changements d'étape** : table `stage_changes` (ancienne étape, nouvelle étape, origine :
+  pipeline, formulaire, suppression d'étape), enregistré automatiquement ; supprimé avec le prospect.
+- **Panneaux de contexte repliables** : coordonnées, activité, score (explication et historique),
+  qualification, préparation d'appel, objections, relances.
+- 8 nouveaux tests (236 au total).
+
+### Modifié
+- La fiche passe de 11 sections empilées à une mise en page en deux colonnes ; les formulaires
+  permanents (interaction, relance, objection) sont remplacés par des fenêtres.
+- `get_prospect_by_id` et `get_tasks` renvoient aussi la date de création en heure locale.
+
+### Tests effectués
+- `python3 -m pytest` : 236 tests réussis ; `revora.db` inchangée.
+- Inventaire sur une copie : toutes les fonctions de l'ancienne fiche présentes ; changement d'étape
+  (historique + timeline), qualification, statut d'objection, relance terminée, ouverture des 4 fenêtres.
+- Navigateur : compteurs tronqués dans la colonne étroite → remplacés par une ligne compacte.
+- Sauvegarde préalable : `backups/20261115-082841/`. Migration : table `stage_changes`.
+
 ## [0.15.0] — 2026-11-15 — P0.2 : navigation du blueprint
 
 ### Modifié

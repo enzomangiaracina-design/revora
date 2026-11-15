@@ -206,6 +206,21 @@ def initialize_database():
         )
     """)
 
+    # HISTORIQUE DES CHANGEMENTS D'ETAPE (P0.3) : chaque passage d'une etape a une
+    # autre est enregistre, avec son origine (pipeline, modification, suppression d'etape).
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stage_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contact_id INTEGER NOT NULL,
+            from_stage TEXT,
+            to_stage TEXT NOT NULL,
+            source TEXT NOT NULL,
+            changed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (contact_id) REFERENCES contacts(id)
+        )
+    """)
+
     # REPONSES RECOMMANDEES par categorie (redigees par le commercial)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS objection_responses (
@@ -301,6 +316,16 @@ def _add_column_if_missing(cursor, table, column, column_type):
 # ==========================================
 # 3. CREATION DES PROSPECTS
 # ==========================================
+
+def _record_stage_change(connection, contact_id, from_stage, to_stage, source):
+    """Ajoute une ligne a l'historique des etapes si l'etape change vraiment."""
+
+    if from_stage != to_stage:
+        connection.execute(
+            "INSERT INTO stage_changes (contact_id, from_stage, to_stage, source) VALUES (?, ?, ?, ?)",
+            (contact_id, from_stage, to_stage, source)
+        )
+
 
 # Valeur speciale : "argument non fourni" (different de None, qui veut dire "vide")
 _UNCHANGED = object()
@@ -509,6 +534,7 @@ def get_prospect_by_id(contact_id):
         """
         SELECT
             contacts.*,
+            datetime(contacts.created_at, 'localtime') AS created_at_local,
             companies.name AS company_name,
             companies.vertical
         FROM contacts
@@ -570,6 +596,10 @@ def update_prospect(
 
         company_id = _get_or_create_company(cursor, company_name, vertical)
 
+        previous = cursor.execute(
+            "SELECT status FROM contacts WHERE id = ?", (contact_id,)
+        ).fetchone()
+
         cursor.execute(
             """
             UPDATE contacts
@@ -604,6 +634,10 @@ def update_prospect(
 
         if cursor.rowcount == 0:
             return False, "Prospect introuvable."
+
+        _record_stage_change(
+            connection, contact_id, previous["status"], _clean(status) or "A prospecter", "edit"
+        )
 
         connection.commit()
 
@@ -652,7 +686,7 @@ def delete_prospect(contact_id):
         deleted = {}
 
         # Les objections d'abord : elles referencent les interactions
-        for table in ("objections", "interactions", "tasks", "scores"):
+        for table in ("objections", "interactions", "tasks", "scores", "stage_changes"):
             deleted[table] = connection.execute(
                 f"DELETE FROM {table} WHERE contact_id = ?",
                 (contact_id,)
@@ -873,10 +907,21 @@ def delete_stage(stage_id, move_to=None):
                     "choisissez une etape de destination."
                 )
 
+            moved = [
+                row["id"] for row in connection.execute(
+                    "SELECT id FROM contacts WHERE status = ?", (stage["name"],)
+                )
+            ]
+
             connection.execute(
                 "UPDATE contacts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE status = ?",
                 (target["name"], stage["name"])
             )
+
+            for contact_id in moved:
+                _record_stage_change(
+                    connection, contact_id, stage["name"], target["name"], "stage deleted"
+                )
 
         connection.execute("DELETE FROM pipeline_stages WHERE id = ?", (stage_id,))
 
@@ -903,13 +948,18 @@ def set_prospect_stage(contact_id, stage_name):
         ).fetchone():
             return False, f"Etape inconnue : {stage_name}"
 
-        cursor = connection.execute(
+        current = connection.execute(
+            "SELECT status FROM contacts WHERE id = ?", (contact_id,)
+        ).fetchone()
+
+        if not current:
+            return False, "Prospect introuvable."
+
+        connection.execute(
             "UPDATE contacts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (stage_name, contact_id)
         )
-
-        if cursor.rowcount == 0:
-            return False, "Prospect introuvable."
+        _record_stage_change(connection, contact_id, current["status"], stage_name, "pipeline")
 
         connection.commit()
 
@@ -1682,6 +1732,26 @@ def create_task(contact_id, title, description, due_at):
 # 9. RECUPERATION DES RELANCES
 # ==========================================
 
+def get_stage_changes(contact_id):
+    """Changements d'etape d'un prospect, du plus recent au plus ancien."""
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT *, datetime(changed_at, 'localtime') AS changed_at_local
+        FROM stage_changes
+        WHERE contact_id = ?
+        ORDER BY id DESC
+        """,
+        (contact_id,)
+    ).fetchall()
+
+    connection.close()
+
+    return [dict(row) for row in rows]
+
+
 def get_tasks(contact_id):
     """Recupere les relances d'un prospect."""
 
@@ -1689,7 +1759,7 @@ def get_tasks(contact_id):
 
     tasks = connection.execute(
         """
-        SELECT *
+        SELECT *, datetime(created_at, 'localtime') AS created_at_local
         FROM tasks
 
         WHERE contact_id = ?

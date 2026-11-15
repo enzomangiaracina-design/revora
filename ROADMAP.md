@@ -73,7 +73,7 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 ## P0 — Fondations UX (blueprint Produit & UX) 🟡
 - ✅ P0.1 Découpage de l'interface : une page = un module (`screens/`), sans changement de comportement
 - ✅ P0.2 Navigation : ordre du blueprint, fiche prospect ouverte depuis les listes (v0.15.0)
-- ⬜ P0.3 Fiche prospect 360° : en-tête, timeline unifiée, historique des changements d'étape
+- ✅ P0.3 Fiche prospect 360° : en-tête, timeline unifiée, historique des changements d'étape (v0.16.0)
 - ⬜ P0.4 États vides / erreur communs à toutes les pages
 
 ## Overview — cockpit du SDR ✅
