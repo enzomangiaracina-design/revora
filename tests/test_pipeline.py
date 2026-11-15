@@ -299,3 +299,16 @@ def test_filter_quick(kwargs, expected):
 def test_created_at_local_is_returned(thomas):
     prospect = database.get_all_prospects()[0]
     assert prospect["created_at_local"]  # heure locale pour l'affichage et les filtres
+
+
+# ---------- P2.4 : définition des étapes ----------
+
+def test_stage_definition_is_saved_and_cleared(temp_db):
+    stage = database.get_stages()[0]
+    assert stage["definition"] is None
+
+    database.set_stage_definition(stage["id"], "  Jamais contacté  ")
+    assert database.get_stages()[0]["definition"] == "Jamais contacté"
+
+    database.set_stage_definition(stage["id"], "  ")
+    assert database.get_stages()[0]["definition"] is None

@@ -68,15 +68,67 @@ def record_objection(contact_id, category, verbatim=None, *, interaction_id=None
     if not category:
         return False, "Choisissez une catégorie d'objection."
 
+    when = occurred_at.strftime("%Y-%m-%d %H:%M:%S") if occurred_at else None
+
+    # P2 : l'échange d'origine doit appartenir au même prospect ; l'objection
+    # prend alors la date de cet échange (sinon : maintenant).
+    if interaction_id is not None:
+        source = next((i for i in database.get_interactions(contact_id) if i["id"] == interaction_id), None)
+
+        if not source:
+            return False, "Cet échange n'appartient pas à ce prospect."
+
+        when = when or source["occurred_at_local"]
+
     database.add_objection(
         contact_id,
         category,
         verbatim=verbatim,
         interaction_id=interaction_id,
-        occurred_at=occurred_at.strftime("%Y-%m-%d %H:%M:%S") if occurred_at else None,
+        occurred_at=when,
     )
 
     return True, f"Objection enregistrée : {category}."
+
+
+def change_category(objection_id, category):
+    """Corrige la catégorie d'une objection mal classée. Retourne (succès, message)."""
+
+    category = (category or "").strip()
+
+    if not category:
+        return False, "Choisissez une catégorie d'objection."
+
+    if not database.set_objection_category(objection_id, category):
+        return False, "Objection introuvable."
+
+    return True, f"Catégorie corrigée : {category}."
+
+
+def interaction_label(channel, subject, at_local):
+    """Libellé court d'un échange : « Call · 10/11 14:05 · Discovery »."""
+
+    parts = [channel or "Interaction"]
+
+    if at_local:
+        parts.append(f"{at_local[8:10]}/{at_local[5:7]} {at_local[11:16]}")
+
+    if subject:
+        parts.append(subject)
+
+    return " · ".join(parts)
+
+
+def source_interaction(objection):
+    """Échange au cours duquel l'objection a été exprimée, ou None s'il n'est pas relié."""
+
+    if not objection.get("interaction_id") or not objection.get("interaction_at_local"):
+        return None
+
+    return interaction_label(
+        objection.get("interaction_channel"), objection.get("interaction_subject"),
+        objection["interaction_at_local"],
+    )
 
 
 # ==========================================

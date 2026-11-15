@@ -81,6 +81,12 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ Actions rapides : ouvrir, terminer, reporter, « Not now » (mise à l'écart datée)
 - ⬜ Brouillons d'emails / préparation assistée : avec l'IA (P3)
 
+## P2 — Finitions (blueprint) ✅
+- ✅ P2.1 Objections : échange d'origine (« Raised during »), catégorie corrigeable dans le journal (v0.19.0)
+- ✅ P2.2 Activity : filtre et colonne « Source », ligne d'état des synchronisations (v0.20.0)
+- ✅ P2.3 Performance : alerte « faible volume » (< 10 données), filtre par commercial du prospect (v0.21.0)
+- ✅ P2.4 Pipeline : définition des étapes, confirmation avant une étape fermée (v0.22.0)
+
 ## Overview — cockpit du SDR ✅
 - ✅ KPI du jour, Today's focus explicable, fil d'activité, résumé 7 jours, états vides, mobile
 - ⬜ Historique des changements d'étape (pour les afficher dans le fil d'activité)

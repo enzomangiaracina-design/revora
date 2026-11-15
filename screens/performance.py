@@ -27,17 +27,37 @@ def render(ctx):
         "based only on recorded interactions"
     )
 
-    all_interactions = get_all_interactions()
-    all_objections = get_objections()
+    # Filtre par commercial : celui du prospect (pas encore l'auteur de chaque interaction)
+    owners = owner_options(prospects)
+    selected_owners = []
+
+    if owners:
+        col_owner, _ = st.columns([2, 3])
+        selected_owners = col_owner.multiselect(
+            "Sales owner", owners, key="performance_owners", placeholder="All sales owners",
+            help="Filters on the prospect's sales owner. Who logged each interaction "
+                 "is not recorded yet (multi-user: phase 11).",
+        )
+
+    prospects = filter_by_owner(prospects, prospects, selected_owners)
+    all_interactions = filter_by_owner(get_all_interactions(), ctx.prospects, selected_owners)
+    all_objections = filter_by_owner(get_objections(), ctx.prospects, selected_owners)
 
     current = compute_kpis(all_interactions, all_objections, start, end)
     previous = compute_kpis(all_interactions, all_objections, previous_start, previous_end)
+    low_volume = low_volume_rates(current)
 
     def kpi(column, label, key, unit="", inverse=False, help_text=None):
         """Carte KPI : un chiffre, un libellé, la comparaison avec la période précédente."""
 
         value = current[key]
         change = delta(value, previous[key])
+
+        # Faible volume : le taux reste affiché, mais signalé comme fragile
+        if key in low_volume:
+            label = f":orange[:material/warning:] {label}"   # icône avant : jamais tronquée
+            help_text = (f"{help_text} " if help_text else "") + (
+                f"Based on few data ({low_volume[key]}): treat with care.")
 
         column.metric(
             label,
@@ -73,6 +93,13 @@ def render(ctx):
     kpi(col2, "Acceptance rate", "linkedin_acceptance_rate", " %",
         help_text="Prospects invited in the period who then accepted / prospects invited.")
     kpi(col3, "LinkedIn messages sent", "linkedin_messages")
+
+    if low_volume:
+        st.caption(
+            f":orange[Low volume — fewer than {MIN_SAMPLE} data points behind: "
+            + ", ".join(low_volume.values())
+            + ". These rates can change a lot with one more result.]"
+        )
 
     st.caption(
         f"{current['contacted']} prospect(s) contacted · {current['replied']} replied · "
@@ -117,6 +144,9 @@ def render(ctx):
             "- **Days between follow-ups**: average gap between two successive outbound touches "
             "on the same prospect.\n"
             "- A rate shows **—** when there is nothing to divide (never a misleading 0 %).\n"
+            f"- **Low volume**: a rate based on fewer than {MIN_SAMPLE} calls, contacted or invited "
+            "prospects is flagged: it is too fragile to compare.\n"
+            "- **Sales owner** filter: uses the prospect's owner, not who logged the interaction.\n"
             "- **Performance by sequence** is not available yet: REVORA has no sequences "
             "(planned with the HubSpot connection)."
         )

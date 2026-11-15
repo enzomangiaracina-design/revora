@@ -270,6 +270,8 @@ def initialize_database():
 
     # MIGRATION (phase 9) : URL du profil LinkedIn (saisie par le commercial)
     _add_column_if_missing(cursor, "contacts", "linkedin_url", "TEXT")
+    # P2.4 : definition de chaque etape (critere d'entree), redigee par l'equipe
+    _add_column_if_missing(cursor, "pipeline_stages", "definition", "TEXT")
 
     connection.commit()
     connection.close()
@@ -732,7 +734,7 @@ def get_stages():
     connection = get_connection()
 
     rows = connection.execute(
-        "SELECT id, name, position, is_closed FROM pipeline_stages ORDER BY position, id"
+        "SELECT id, name, position, is_closed, definition FROM pipeline_stages ORDER BY position, id"
     ).fetchall()
 
     connection.close()
@@ -945,6 +947,21 @@ def delete_stage(stage_id, move_to=None):
     except Exception:
         connection.rollback()
         raise
+
+    finally:
+        connection.close()
+
+
+def set_stage_definition(stage_id, definition):
+    """Enregistre la definition d'une etape (texte libre, vide = aucune)."""
+
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            "UPDATE pipeline_stages SET definition = ? WHERE id = ?", (_clean(definition), stage_id)
+        )
+        connection.commit()
 
     finally:
         connection.close()
@@ -1250,7 +1267,10 @@ def get_objections(contact_id=None):
             contacts.email,
             contacts.phone,
             companies.name AS company_name,
-            companies.vertical
+            companies.vertical,
+            interactions.channel AS interaction_channel,
+            interactions.subject AS interaction_subject,
+            datetime(interactions.occurred_at, 'localtime') AS interaction_at_local
         FROM objections
 
         JOIN contacts
@@ -1258,6 +1278,10 @@ def get_objections(contact_id=None):
 
         LEFT JOIN companies
             ON contacts.company_id = companies.id
+
+        -- P2 : l'echange au cours duquel l'objection a ete exprimee (s'il est connu)
+        LEFT JOIN interactions
+            ON objections.interaction_id = interactions.id
     """
 
     params = ()
@@ -1285,6 +1309,23 @@ def set_objection_status(objection_id, status):
             "UPDATE objections SET status = ? WHERE id = ?", (status, objection_id)
         )
         connection.commit()
+
+    finally:
+        connection.close()
+
+
+def set_objection_category(objection_id, category):
+    """Corrige la categorie d'une objection (P2). Retourne True si elle existait."""
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute(
+            "UPDATE objections SET category = ? WHERE id = ?", (category.strip(), objection_id)
+        )
+        connection.commit()
+
+        return cursor.rowcount == 1
 
     finally:
         connection.close()

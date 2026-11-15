@@ -241,6 +241,7 @@ export default function (component) {
         const header = el('div', 'column-header');
         const count = el('span', 'count', String(stage.cards.length));
         header.append(el('span', null, stage.name), count);
+        if (stage.definition) header.title = stage.definition;   // définition au survol
         if (stage.closed) header.append(el('span', 'closed', 'closed'));
         counters[stage.name] = count;
 
@@ -345,7 +346,7 @@ _render = st.components.v2.component("revora_pipeline_board", html=HTML, css=CSS
 def pipeline_board(stages, key, on_move, on_open):
     """Affiche le tableau.
 
-    stages  : [{"name", "closed", "cards": [carte, ...]}, ...]
+    stages  : [{"name", "closed", "definition", "cards": [carte, ...]}, ...]
     on_move : appelée après un glisser-déposer ; lire st.session_state[key]["move"]
     on_open : appelée au clic sur une carte ; lire st.session_state[key]["open"]
     """

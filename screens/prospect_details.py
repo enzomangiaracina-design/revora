@@ -76,10 +76,21 @@ def objection_dialog(contact_id):
             index=None, accept_new_options=True, placeholder="Choose or type",
         )
         verbatim = st.text_input("Wording (optional)")
+
+        # P2 : relier l'objection à l'échange où elle a été exprimée (facultatif)
+        recent = get_interactions(contact_id)[:10]
+        raised_during = st.selectbox(
+            "Raised during (optional)", [i["id"] for i in recent], index=None,
+            format_func=lambda i: next(
+                interaction_label(x["channel"], x["subject"], x["occurred_at_local"]) for x in recent if x["id"] == i
+            ),
+            placeholder="Not linked to an interaction" if recent else "No interaction logged yet",
+            disabled=not recent,
+        )
         submitted = st.form_submit_button("Add objection", width="stretch")
 
     if submitted:
-        ok, message = record_objection(contact_id, category, verbatim)
+        ok, message = record_objection(contact_id, category, verbatim, interaction_id=raised_during)
 
         if ok:
             st.session_state["flash"] = message
@@ -105,11 +116,12 @@ def edit_prospect_dialog(contact_id):
             st.error(message)
 
 
-def _change_stage(contact_id, widget_key):
-    """Callback du choix d'étape dans l'en-tête."""
+def _change_stage(contact_id, widget_key, current_stage):
+    """Callback du choix d'étape dans l'en-tête (confirmation si l'étape est fermée)."""
 
-    ok, message = set_prospect_stage(contact_id, st.session_state[widget_key])
-    st.session_state["flash"] = message if ok else f"Error: {message}"
+    if not request_stage_change(contact_id, st.session_state[widget_key]):
+        # En attente de confirmation (ou refus) : le sélecteur reste sur l'étape actuelle
+        st.session_state[widget_key] = current_stage
 
 
 # ==========================================
@@ -162,6 +174,7 @@ def render(ctx):
         return
 
     show_flash_message()
+    stage_change_confirmation()
 
     interactions = get_interactions(contact_id)
     tasks = get_tasks(contact_id)
@@ -196,7 +209,9 @@ def render(ctx):
 
         st.selectbox(
             "Stage", options, index=options.index(prospect["status"]), key=stage_key,
-            on_change=_change_stage, args=(contact_id, stage_key),
+            on_change=_change_stage, args=(contact_id, stage_key, prospect["status"]),
+            help=next((s["definition"] for s in get_stages()
+                       if s["name"] == prospect["status"] and s.get("definition")), None),
         )
 
         col_a, col_b = st.columns(2)

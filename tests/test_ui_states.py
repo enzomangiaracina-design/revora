@@ -170,3 +170,109 @@ def test_expired_snooze_is_ignored(focus_data):
     database.snooze_prospect(focus_data["Lina"], (date.today() - timedelta(days=1)).isoformat())
 
     assert database.get_active_snoozes(date.today().isoformat()) == {}
+
+
+# ---------- P2 : objection reliée à son échange ----------
+# (AppTest ne pilote pas les st.dialog : la fenêtre est vérifiée dans le navigateur)
+
+def test_objections_log_shows_the_source_interaction(focus_data):
+    from core import objection_service
+    paul = focus_data["Paul"]
+    call_id = database.add_interaction(paul, "Call", "Outbound", "Completed", "Discovery", "", "",
+                                       occurred_at="2026-11-10 14:05:00")
+    objection_service.record_objection(paul, "No budget", interaction_id=call_id)
+
+    at = open_page("Objections")
+    log = at.dataframe[-1].value
+
+    assert not at.exception
+    assert list(log["Raised during"]) == ["Call · 10/11 14:05 · Discovery"]
+
+
+# ---------- P2.2 : Activity, filtre par source et état des synchronisations ----------
+
+def test_activity_source_filter_and_sync_line(focus_data):
+    from datetime import datetime as dt, timezone
+    now = dt.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    database.add_interaction(focus_data["Paul"], "Call", "Outbound", "Completed", "Manual call", "", "")
+    database.add_external_interaction(focus_data["Lina"], "gmail", "msg-1", "Email", "Inbound",
+                                      "Completed", now, subject="Synced email")
+
+    at = open_page("Activity")
+    assert not at.exception
+    assert "Sync:" in texts(at) and "not connected" in texts(at)
+    assert sorted(at.dataframe[0].value["Source"]) == ["Gmail", "Manual"]
+
+    at.multiselect(key="activity_sources").set_value(["Gmail"]).run()
+    assert list(at.dataframe[0].value["Subject"]) == ["Synced email"]
+
+
+# ---------- P2.3 : Performance, faible volume et filtre par commercial ----------
+
+def test_performance_low_volume_and_owner_filter(temp_db):
+    database.create_prospect("Paul", "Roux", "Fintra", "Finance", None, "0611", None)
+    database.create_prospect("Lina", "Faure", "Medivia", "Santé", None, "0622", None)
+    ids = {p["first_name"]: p["id"] for p in database.get_all_prospects()}
+    p = database.get_prospect_by_id(ids["Paul"])
+    database.update_prospect(ids["Paul"], "Paul", "Roux", "Fintra", "Finance", None, "0611", None,
+                             p["status"], owner="Lea")
+    for name in ("Paul", "Lina"):
+        database.add_interaction(ids[name], "Call", "Outbound", "Completed", "", "", "")
+
+    at = open_page("Performance")
+    assert not at.exception
+    assert ":orange[:material/warning:] Connection rate" in [m.label for m in at.metric]
+    assert "connection rate: 2 calls" in texts(at)
+
+    at.multiselect(key="performance_owners").set_value(["Lea"]).run()
+    assert "connection rate: 1 call" in texts(at)
+
+
+# ---------- P2.4 : confirmation avant une étape fermée ----------
+
+def open_file(contact_id):
+    at = AppTest.from_file(MAIN, default_timeout=60)
+    at.session_state["prospect_open"] = True
+    at.session_state["details_prospect"] = contact_id
+    return at.run()
+
+
+def test_open_stage_moves_immediately(focus_data):
+    paul = focus_data["Paul"]
+    at = open_file(paul)
+    at.selectbox(key=f"stage_select_{paul}").set_value("En contact").run()
+
+    assert database.get_prospect_by_id(paul)["status"] == "En contact"
+    assert not at.exception
+
+
+def test_closed_stage_asks_for_confirmation(focus_data):
+    paul = focus_data["Paul"]
+    at = open_file(paul)
+    at.selectbox(key=f"stage_select_{paul}").set_value("Disqualifié").run()
+
+    # Rien n'est appliqué tant que ce n'est pas confirmé ; le sélecteur reste sur l'étape actuelle
+    assert database.get_prospect_by_id(paul)["status"] == "A prospecter"
+    assert at.selectbox(key=f"stage_select_{paul}").value == "A prospecter"
+    assert "to the closed stage" in texts(at)
+
+    at.button(key="stage_change_cancel").click().run()
+    assert database.get_prospect_by_id(paul)["status"] == "A prospecter"
+    assert "to the closed stage" not in texts(at)
+
+    at.selectbox(key=f"stage_select_{paul}").set_value("Disqualifié").run()
+    at.button(key="stage_change_confirm").click().run()
+    assert database.get_prospect_by_id(paul)["status"] == "Disqualifié"
+    assert [c["to_stage"] for c in database.get_stage_changes(paul)] == ["Disqualifié"]
+    assert not at.exception
+
+
+def test_stage_definition_edited_in_stages_view(temp_db):
+    at = open_page("Prospecting Pipeline")
+    at.segmented_control(key="pipeline_view").set_value("Stages").run()
+    first = database.get_stages()[0]
+    at.text_input(key=f"stage_definition_{first['id']}").set_value("Jamais contacté").run()
+    at.button(key=f"stage_definition_save_{first['id']}").click().run()
+
+    assert database.get_stages()[0]["definition"] == "Jamais contacté"
+    assert not at.exception

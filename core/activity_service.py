@@ -210,3 +210,67 @@ def format_duration(metadata):
     minutes, seconds = divmod(int(seconds), 60)
 
     return f"{minutes} min {seconds} s" if seconds else f"{minutes} min"
+
+
+# ==========================================
+# P2.2 : SOURCE DES INTERACTIONS ET ÉTAT DES SYNCHRONISATIONS
+# ==========================================
+
+# Origine d'une interaction (colonne interactions.provider)
+SOURCE_LABELS = {"manual": "Manual", "hubspot": "HubSpot", "gmail": "Gmail"}
+
+# Connecteurs dont on affiche l'état (ordre d'affichage)
+SYNC_PROVIDERS = [("hubspot", "HubSpot"), ("gmail", "Gmail")]
+
+
+def source_label(provider):
+    """Libellé lisible de l'origine d'une interaction ("manual" -> "Manual")."""
+
+    return SOURCE_LABELS.get(provider, (provider or "manual").capitalize())
+
+
+def source_options(interactions):
+    """Sources proposées dans le filtre : les sources connues, puis toute autre présente."""
+
+    known = list(SOURCE_LABELS.values())
+    others = sorted({source_label(i.get("provider")) for i in interactions} - set(known))
+
+    return known + others
+
+
+def filter_by_source(interactions, labels):
+    """Garde les interactions dont la source est dans labels (liste vide = tout)."""
+
+    if not labels:
+        return interactions
+
+    return [i for i in interactions if source_label(i.get("provider")) in labels]
+
+
+def sync_status(integrations, providers=SYNC_PROVIDERS):
+    """État de chaque connecteur, tel qu'enregistré (rien n'est supposé).
+
+    integrations : résultat de database.get_integrations().
+    Retourne une liste de {"label", "state", "text"} ; state vaut
+    "not_connected", "connected" ou "error".
+    """
+
+    lines = []
+
+    for provider, label in providers:
+        info = integrations.get(provider) or {}
+        last_sync = info.get("last_sync_at")
+        when = f"{last_sync[8:10]}/{last_sync[5:7]} {last_sync[11:16]}" if last_sync else None
+
+        if info.get("status") == "Error":
+            text = f"error: {info.get('last_error') or 'unknown'}"
+            text += f" (last successful sync {when})" if when else " (never synced)"
+            state = "error"
+        elif when:
+            text, state = f"last sync {when}", "connected"
+        else:
+            text, state = "not connected", "not_connected"
+
+        lines.append({"label": label, "state": state, "text": text})
+
+    return lines

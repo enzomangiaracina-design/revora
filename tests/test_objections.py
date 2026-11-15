@@ -200,3 +200,53 @@ def test_date_cannot_be_passed_as_interaction_id(thomas):
         service.record_objection(thomas, "No budget", "x", datetime(2026, 11, 3, 10))
 
     assert database.get_objections() == []
+
+
+# ---------- P2 : échange d'origine et correction de catégorie ----------
+
+def _call(contact_id, when="2026-11-10 14:05:00"):
+    return database.add_interaction(contact_id, "Call", "Outbound", "Completed", "Discovery", "", "",
+                                    occurred_at=when)
+
+
+def test_objection_linked_to_its_interaction(thomas):
+    call_id = _call(thomas)
+
+    ok, _ = service.record_objection(thomas, "No budget", "Pas avant mars", interaction_id=call_id)
+
+    saved = database.get_objections(thomas)[0]
+    assert ok
+    assert saved["interaction_id"] == call_id
+    assert saved["occurred_at_local"] == "2026-11-10 14:05:00"      # date de l'échange, pas « maintenant »
+    assert service.source_interaction(saved) == "Call · 10/11 14:05 · Discovery"
+
+
+def test_interaction_of_another_prospect_is_refused(thomas):
+    database.create_prospect("Ana", "Lopez", "Acme", "SaaS", None, None, None)
+    ana = next(p["id"] for p in database.get_all_prospects() if p["first_name"] == "Ana")
+    other_call = _call(ana)
+
+    ok, message = service.record_objection(thomas, "No budget", interaction_id=other_call)
+
+    assert not ok and "n'appartient pas" in message
+    assert database.get_objections(thomas) == []
+
+
+def test_unlinked_objection_has_no_source(thomas):
+    service.record_objection(thomas, "Bad timing")
+
+    assert service.source_interaction(database.get_objections(thomas)[0]) is None
+
+
+def test_change_category(thomas):
+    service.record_objection(thomas, "No budget")
+    objection_id = database.get_objections(thomas)[0]["id"]
+
+    assert service.change_category(objection_id, "  Price too high ") == (True, "Catégorie corrigée : Price too high.")
+    assert database.get_objections(thomas)[0]["category"] == "Price too high"
+    assert service.change_category(objection_id, " ")[0] is False
+    assert service.change_category(9999, "No budget") == (False, "Objection introuvable.")
+
+
+def test_interaction_label_without_subject():
+    assert service.interaction_label("Email", None, "2026-11-12 09:00:00") == "Email · 12/11 09:00"

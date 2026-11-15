@@ -50,7 +50,8 @@ def render(ctx):
     col4.metric("Most frequent", by_category[0][0] if by_category else "—")
 
     tab_insights, tab_playbook, tab_log = st.tabs(
-        ["Insights", "Playbook", "Log"], key="objections_tabs"
+        ["Insights", "Playbook", "Log"], key="objections_tabs",
+        on_change="rerun",   # garde l'onglet ouvert après une correction dans le journal
     )
 
     # ---------- ANALYSE ----------
@@ -165,33 +166,43 @@ def render(ctx):
                     "Stage": o["stage"],
                     "Category": o["category"],
                     "Wording": o["verbatim"],
+                    "Raised during": source_interaction(o) or "—",
                     "Status": o["status"],
                     "Source": o["source"],
                 }
                 for o in objections
             ])
 
+            st.caption("Category and status can be corrected directly in the table.")
+
+            editable = ["Category", "Status"]
             edited = st.data_editor(
                 log,
                 column_config={
                     "id": None,
+                    "Category": st.column_config.SelectboxColumn(
+                        "Category", options=objection_categories(all_objections), required=True),
                     "Status": st.column_config.SelectboxColumn("Status", options=OBJECTION_STATUSES, required=True),
                 },
-                disabled=[c for c in log.columns if c != "Status"],
+                disabled=[c for c in log.columns if c not in editable],
                 hide_index=True,
                 width="stretch",
                 key="objections_log_editor",
             )
 
             changes = [
-                (int(row["id"]), row["Status"])
+                (int(row["id"]), column, row[column])
                 for (_, row), (_, before) in zip(edited.iterrows(), log.iterrows())
-                if row["Status"] != before["Status"]
+                for column in editable
+                if row[column] != before[column]
             ]
 
             if changes:
-                for objection_id, status in changes:
-                    set_objection_status(objection_id, status)
+                for objection_id, column, value in changes:
+                    if column == "Status":
+                        set_objection_status(objection_id, value)
+                    else:
+                        change_objection_category(objection_id, value)
                 st.session_state.pop("objections_log_editor", None)
-                st.session_state["flash"] = f"{len(changes)} objection status(es) updated."
+                st.session_state["flash"] = f"{len(changes)} objection change(s) saved."
                 st.rerun()

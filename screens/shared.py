@@ -264,14 +264,86 @@ def table_key(table_name):
     return f"{table_name}_{st.session_state.get(f'_table_version_{table_name}', 0)}"
 
 
+# ---------- P2.4 : changement d'étape, avec confirmation vers une étape fermée ----------
+
+PENDING_STAGE = "pending_stage_change"
+
+
+def request_stage_change(contact_id, stage_name):
+    """Déplace un prospect, sauf vers une étape FERMÉE : on demande d'abord confirmation.
+
+    Concept : une étape fermée (Perdu, Disqualifié…) sort le prospect du tableau
+    et des priorités. Une erreur de glisser-déposer passerait inaperçue : la
+    demande est donc mise en attente (st.session_state) jusqu'à confirmation.
+    Retourne True si le changement est appliqué tout de suite.
+    """
+
+    stage = next((s for s in get_stages() if s["name"] == stage_name), None)
+    current = get_prospect_by_id(contact_id)
+
+    if stage and stage["is_closed"] and current and current["status"] != stage_name:
+        st.session_state[PENDING_STAGE] = {
+            "id": contact_id,
+            "name": f"{current['first_name']} {current['last_name']}",
+            "from": current["status"],
+            "stage": stage_name,
+            "definition": stage.get("definition"),
+        }
+        return False
+
+    ok, message = set_prospect_stage(contact_id, stage_name)
+    st.session_state["flash"] = message if ok else f"Error: {message}"
+    return ok
+
+
+def _confirm_stage_change():
+    pending = st.session_state.pop(PENDING_STAGE, None)
+
+    if pending:
+        ok, message = set_prospect_stage(pending["id"], pending["stage"])
+        st.session_state["flash"] = message if ok else f"Error: {message}"
+
+
+def _cancel_stage_change():
+    pending = st.session_state.pop(PENDING_STAGE, None)
+
+    if pending:
+        st.session_state["flash"] = f"{pending['name']} stays in « {pending['from']} »."
+        # Le tableau est redessiné à partir des données : la carte revient à sa place
+        st.session_state["board_revision"] = st.session_state.get("board_revision", 0) + 1
+
+
+def stage_change_confirmation():
+    """Bandeau de confirmation d'un déplacement vers une étape fermée (s'il y en a un)."""
+
+    pending = st.session_state.get(PENDING_STAGE)
+
+    if not pending:
+        return
+
+    with st.container(border=True):
+        st.markdown(
+            f":orange[:material/warning:] Move **{pending['name']}** from « {pending['from']} » "
+            f"to the closed stage **« {pending['stage']} »**?"
+        )
+        st.caption(
+            "A closed stage means the prospect is no longer worked: it leaves the board "
+            "(unless closed stages are shown) and Today's focus."
+            + (f" Stage definition: {pending['definition']}" if pending.get("definition") else "")
+        )
+        with st.container(horizontal=True):
+            st.button("Confirm move", type="primary", key="stage_change_confirm",
+                      on_click=_confirm_stage_change)
+            st.button("Cancel", key="stage_change_cancel", on_click=_cancel_stage_change)
+
+
 def _on_board_move():
-    """Glisser-deposer d'une carte : enregistre la nouvelle etape."""
+    """Glisser-deposer d'une carte : enregistre la nouvelle etape (ou demande confirmation)."""
 
     move = event_value(BOARD_KEY, "move")
 
     if move:
-        ok, message = set_prospect_stage(int(move["id"]), move["stage"])
-        st.session_state["flash"] = message if ok else f"Error: {message}"
+        request_stage_change(int(move["id"]), move["stage"])
 
 
 def _on_board_open():

@@ -37,7 +37,11 @@ from core.activity_service import (
     group_tasks,
     period_bounds,
     count_by_channel,
-    format_duration
+    format_duration,
+    source_label,
+    source_options,
+    filter_by_source,
+    sync_status
 )
 
 from database import (
@@ -47,6 +51,7 @@ from database import (
     rename_stage,
     move_stage,
     set_stage_closed,
+    set_stage_definition,
     delete_stage,
     set_prospect_stage
 )
@@ -102,6 +107,9 @@ from core.objection_service import (
     PLAYBOOK_PLACEHOLDER,
     categories as objection_categories,
     record_objection,
+    change_category as change_objection_category,
+    interaction_label,
+    source_interaction,
     count_by,
     filter_period,
     weekly_trend,
@@ -118,7 +126,11 @@ from core.performance_service import (
     compute_kpis,
     delta,
     daily_activity,
-    by_vertical
+    by_vertical,
+    MIN_SAMPLE,
+    low_volume_rates,
+    owner_options,
+    filter_by_owner
 )
 
 from database import get_recent_score_changes

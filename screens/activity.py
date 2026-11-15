@@ -40,14 +40,29 @@ def render(ctx):
 
     with tab_timeline:
 
-        col_period, col_channel, col_search = st.columns([1, 2, 2])
+        # État des synchronisations : d'où viennent (ou viendront) les interactions
+        status_colors = {"connected": "green", "error": "red", "not_connected": "gray"}
+        col_sync, col_settings = st.columns([5, 1], vertical_alignment="center")
+        col_sync.caption(
+            "Sync: " + " · ".join(
+                f"**{line['label']}** :{status_colors[line['state']]}[{line['text']}]"
+                for line in sync_status(get_integrations())
+            )
+        )
+        col_settings.button("Settings", type="tertiary", icon=":material/settings:",
+                            key="activity_sync_settings", on_click=go_to, args=("Settings",))
+
+        col_period, col_channel, col_source, col_search = st.columns([1, 1.5, 1.5, 2])
 
         period = col_period.selectbox("Period", PERIODS, index=1)
         selected_channels = col_channel.multiselect("Type", CHANNELS)
+        all_activity = get_all_interactions()
+        selected_sources = col_source.multiselect("Source", source_options(all_activity),
+                                                  key="activity_sources")
         search = col_search.text_input("Prospect or company")
 
         start, end = period_bounds(period)
-        activity = get_all_interactions(selected_channels, start, end)
+        activity = filter_by_source(get_all_interactions(selected_channels, start, end), selected_sources)
 
         if search.strip():
             needle = search.strip().lower()
@@ -72,13 +87,14 @@ def render(ctx):
                         "Subject": item["subject"],
                         "Notes": item["content"],
                         "Next step": item["outcome"],
+                        "Source": source_label(item.get("provider")),
                     }
                     for item in activity
                 ]),
                 width="stretch",
                 hide_index=True
             )
-        elif not get_all_interactions():
+        elif not all_activity:
             empty_state(
                 "No activity recorded yet",
                 "Log your calls, emails, LinkedIn messages and notes to build each prospect's history.",

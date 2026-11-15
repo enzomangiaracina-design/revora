@@ -25,6 +25,7 @@ def render(ctx):
     ) or "Board"
 
     show_flash_message()
+    stage_change_confirmation()
 
     stages = get_stages()
     summaries = get_activity_summary()
@@ -117,6 +118,8 @@ def render(ctx):
                 {
                     "name": stage["name"],
                     "closed": stage["is_closed"],
+                    "definition": stage.get("definition"),
+                    "revision": st.session_state.get("board_revision", 0),
                     "cards": [
                         build_card(p, summaries.get(p["id"]), scores.get(p["id"]), stale_days)
                         for p in board[stage["name"]]
@@ -205,7 +208,9 @@ def render(ctx):
         st.caption(
             "Renaming a stage also updates every prospect in it. "
             "A closed stage means the prospect is no longer worked "
-            "(hidden from the board by default, excluded from priorities)."
+            "(hidden from the board by default, excluded from priorities; moving a prospect "
+            "there asks for confirmation). Write a definition so everyone uses the stages the same way: "
+            "it appears when hovering a board column and in the prospect file."
         )
 
         counts = {s["name"]: 0 for s in stages}
@@ -252,6 +257,18 @@ def render(ctx):
                             st.rerun()
                         else:
                             st.error(message)
+
+                definition = st.text_input(
+                    "Definition", value=stage.get("definition") or "",
+                    key=f"stage_definition_{stage['id']}",
+                    placeholder="When does a prospect enter this stage? Example: first call answered, need discussed",
+                )
+
+                if definition.strip() != (stage.get("definition") or ""):
+                    if st.button("Save definition", key=f"stage_definition_save_{stage['id']}"):
+                        set_stage_definition(stage["id"], definition)
+                        st.session_state["flash"] = f"Definition saved for « {stage['name']} »."
+                        st.rerun()
 
                 with c_actions.popover("Delete"):
 

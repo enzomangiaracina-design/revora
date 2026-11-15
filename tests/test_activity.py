@@ -189,3 +189,42 @@ def test_count_by_channel():
 ])
 def test_format_duration(metadata, expected):
     assert service.format_duration(metadata) == expected
+
+
+# ---------- P2.2 : source des interactions et état des synchronisations ----------
+
+from core.activity_service import filter_by_source, source_label, source_options, sync_status
+
+
+def test_source_label_and_options():
+    items = [{"provider": "manual"}, {"provider": None}, {"provider": "gmail"}, {"provider": "noota"}]
+
+    assert [source_label(i["provider"]) for i in items] == ["Manual", "Manual", "Gmail", "Noota"]
+    assert source_options(items) == ["Manual", "HubSpot", "Gmail", "Noota"]
+
+
+def test_filter_by_source():
+    items = [{"provider": "manual"}, {"provider": "hubspot"}, {"provider": "gmail"}]
+
+    assert filter_by_source(items, ["HubSpot", "Gmail"]) == items[1:]
+    assert filter_by_source(items, []) == items
+
+
+def test_sync_status_reports_only_what_is_recorded():
+    lines = sync_status({
+        "hubspot": {"status": "Connected", "last_sync_at": "2026-11-15 13:04:00", "last_error": None},
+        "gmail": {"status": "Error", "last_sync_at": None, "last_error": "HTTP 401"},
+    })
+
+    assert lines == [
+        {"label": "HubSpot", "state": "connected", "text": "last sync 15/11 13:04"},
+        {"label": "Gmail", "state": "error", "text": "error: HTTP 401 (never synced)"},
+    ]
+    assert [l["state"] for l in sync_status({})] == ["not_connected", "not_connected"]
+
+
+def test_sync_status_from_database(temp_db):
+    database.set_integration_status("gmail", "Error", "Token expired")
+
+    gmail = sync_status(database.get_integrations())[1]
+    assert (gmail["state"], gmail["text"]) == ("error", "error: Token expired (never synced)")

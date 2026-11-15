@@ -97,3 +97,49 @@ def test_by_vertical():
     assert (rows["SaaS"]["Reply rate (%)"], rows["SaaS"]["Conversion (%)"]) == (50, 50)
     assert rows["SaaS"]["Objections"] == 1
     assert rows["Finance"]["Calls"] == 0 and rows["Finance"]["Connection rate (%)"] is None
+
+
+# ---------- P2.3 : faible volume et filtre par commercial ----------
+
+from core.performance_service import (
+    MIN_SAMPLE, filter_by_owner, low_volume_rates, owner_options,
+)
+
+
+def test_low_volume_flags_only_small_samples():
+    kpis = {"calls": 3, "connection_rate": 67, "contacted": 1, "reply_rate": 100,
+            "conversion_rate": 0, "invited": 0, "linkedin_acceptance_rate": None}
+
+    assert low_volume_rates(kpis) == {
+        "connection_rate": "connection rate: 3 calls",
+        "reply_rate": "reply rate: 1 prospect contacted",
+        "conversion_rate": "conversion rate: 1 prospect contacted",
+    }
+
+
+def test_enough_volume_is_not_flagged():
+    kpis = {"calls": MIN_SAMPLE, "connection_rate": 40, "contacted": 25, "reply_rate": 12,
+            "conversion_rate": 4, "invited": 12, "linkedin_acceptance_rate": 50}
+
+    assert low_volume_rates(kpis) == {}
+
+
+PROSPECTS = [{"id": 1, "owner": "Lea"}, {"id": 2, "owner": "Marc"}, {"id": 3, "owner": None}]
+
+
+def test_owner_options():
+    assert owner_options(PROSPECTS) == ["Lea", "Marc", "Unassigned"]
+    assert owner_options(PROSPECTS[:2]) == ["Lea", "Marc"]
+
+
+def test_filter_by_owner_on_interactions_and_prospects():
+    interactions = [{"contact_id": 1}, {"contact_id": 2}, {"contact_id": 3}]
+
+    assert filter_by_owner(interactions, PROSPECTS, ["Lea", "Unassigned"]) == [{"contact_id": 1}, {"contact_id": 3}]
+    assert filter_by_owner(PROSPECTS, PROSPECTS, ["Marc"]) == [PROSPECTS[1]]
+    assert filter_by_owner(interactions, PROSPECTS, []) == interactions
+    assert filter_by_owner([], PROSPECTS, ["Lea"]) == []
+
+
+def test_compute_kpis_exposes_invited_sample():
+    assert perf.compute_kpis([], [], date(2026, 11, 1), date(2026, 11, 14))["invited"] == 0

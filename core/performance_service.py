@@ -177,6 +177,7 @@ def compute_kpis(all_interactions, objections, start, end):
             if i["channel"] == "LinkedIn" and i["event_type"] == "Connection request sent"
         ),
         "linkedin_acceptance_rate": _ratio(len(accepted), len(first_request)),
+        "invited": len(first_request),
         "linkedin_messages": sum(
             1 for i in period
             if i["channel"] == "LinkedIn" and i["direction"] == "Outbound"
@@ -253,3 +254,66 @@ def by_vertical(all_interactions, objections, prospects, start, end):
         })
 
     return sorted(rows, key=lambda r: (-r["Prospects contacted"], r["Vertical"]))
+
+
+# ==========================================
+# P2.3 : FAIBLE VOLUME ET FILTRE PAR COMMERCIAL
+# ==========================================
+
+# En dessous de cet échantillon, un taux est trop fragile pour être interprété
+# (1 réponse sur 3 prospects = 33 %, mais cela ne veut encore rien dire).
+MIN_SAMPLE = 10
+
+# Taux -> (clé de l'échantillon, libellé du taux, unité au singulier, unité au pluriel)
+RATE_SAMPLES = {
+    "connection_rate": ("calls", "connection rate", "call", "calls"),
+    "reply_rate": ("contacted", "reply rate", "prospect contacted", "prospects contacted"),
+    "conversion_rate": ("contacted", "conversion rate", "prospect contacted", "prospects contacted"),
+    "linkedin_acceptance_rate": ("invited", "acceptance rate", "prospect invited", "prospects invited"),
+}
+
+
+def low_volume_rates(kpis, minimum=MIN_SAMPLE):
+    """Taux calculés sur un échantillon trop petit pour être fiables.
+
+    Retourne {clé du taux: texte}, par ex. {"reply_rate": "reply rate: 3 prospects contacted"}.
+    Un taux absent (None, rien à diviser) n'est pas signalé : il s'affiche déjà « — ».
+    """
+
+    warnings = {}
+
+    for rate, (sample_key, label, singular, plural) in RATE_SAMPLES.items():
+        sample = kpis.get(sample_key) or 0
+
+        if kpis.get(rate) is not None and sample < minimum:
+            warnings[rate] = f"{label}: {sample} {singular if sample == 1 else plural}"
+
+    return warnings
+
+
+UNASSIGNED = "Unassigned"
+
+
+def owner_options(prospects):
+    """Commerciaux proposés dans le filtre (propriétaires des prospects), puis « Unassigned »."""
+
+    owners = sorted({p["owner"] for p in prospects if p.get("owner")})
+
+    return owners + ([UNASSIGNED] if any(not p.get("owner") for p in prospects) else [])
+
+
+def filter_by_owner(items, prospects, owners):
+    """Garde les éléments (interactions, objections, prospects) des prospects des commerciaux choisis.
+
+    Le commercial est celui du PROSPECT (contacts.owner) : REVORA n'enregistre pas
+    encore qui a réalisé chaque interaction (multi-utilisateur : phase 11).
+    owners vide = aucun filtre.
+    """
+
+    if not owners:
+        return items
+
+    owner_of = {p["id"]: p.get("owner") or UNASSIGNED for p in prospects}
+    key = "contact_id" if items and "contact_id" in items[0] else "id"
+
+    return [item for item in items if owner_of.get(item[key]) in owners]

@@ -9,7 +9,7 @@ Chaque événement : {"at", "kind", "title", "detail", "meta", "source"}.
 
 KINDS = ["Interaction", "Follow-up", "Objection", "Stage", "Score", "Prospect"]
 
-SOURCE_LABELS = {"manual": "Manual", "hubspot": "HubSpot", "gmail": "Gmail"}
+from core.activity_service import SOURCE_LABELS  # une seule définition des sources
 
 
 def _interaction_event(item, format_duration):
@@ -56,7 +56,9 @@ def build_timeline(prospect, interactions, tasks, objections, score_history, sta
             "kind": "Objection",
             "title": f"Objection · {objection['category']}",
             "detail": f"“{objection['verbatim']}”" if objection.get("verbatim") else "",
-            "meta": f"Status: {objection['status']} · stage: {objection.get('stage') or '—'}",
+            "meta": f"Status: {objection['status']} · stage: {objection.get('stage') or '—'}"
+                    + (f" · during {objection['interaction_channel'] or 'interaction'}"
+                       if objection.get("interaction_at_local") else ""),
             "source": SOURCE_LABELS.get(objection.get("source"), objection.get("source") or "Manual"),
         })
 

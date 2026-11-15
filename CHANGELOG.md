@@ -1,6 +1,92 @@
 # CHANGELOG — REVORA
 
-## [Non publié] — 2026-11-15 — Dépôt GitHub
+## [0.22.0] — 2026-11-15 — P2.4 : Pipeline, définitions et confirmation des étapes fermées
+
+### Ajouté
+- **Définition des étapes** (Pipeline › Stages) : un champ « Definition » par étape (« quand un
+  prospect entre-t-il dans cette étape ? »), rédigé par l'équipe — REVORA n'en invente aucune.
+  Elle s'affiche au survol de l'en-tête de colonne du tableau, dans l'aide du sélecteur d'étape
+  de la fiche prospect et dans le bandeau de confirmation.
+- **Confirmation avant une étape fermée** : glisser une carte vers « Non intéressé », « Disqualifié »
+  (ou toute étape marquée Closed), ou la choisir dans la fiche prospect, affiche un bandeau
+  « Move … to the closed stage …? » avec **Confirm move** / **Cancel**. Rien n'est enregistré avant
+  la confirmation ; en cas d'annulation, la carte revient à sa place. Les étapes ouvertes restent
+  immédiates.
+- `database.set_stage_definition` ; `get_stages` renvoie `definition`.
+- `screens/shared.py` : `request_stage_change`, `stage_change_confirmation`.
+
+### Base de données
+- Migration additive : colonne `pipeline_stages.definition` (vide par défaut, aucune donnée modifiée).
+
+### Limite connue
+- Le formulaire **Edit** (fiche et page Prospects) change l'étape sans cette confirmation :
+  c'est une action explicite en deux temps (saisie puis Save).
+
+### Tests
+- 296 tests (4 nouveaux). Vérifié dans le navigateur sur une **copie** de la base : glisser-déposer
+  vers une étape ouverte (immédiat), vers une étape fermée (bandeau, annulation → carte revenue,
+  confirmation → enregistré), définition au survol. `revora.db` n'a pas été modifiée.
+
+## [0.21.0] — 2026-11-15 — P2.3 : Performance, faible volume et filtre par commercial
+
+### Ajouté
+- **Alerte « faible volume »** : un taux calculé sur moins de 10 données (appels, prospects contactés
+  ou invités) garde sa valeur mais porte une icône orange ⚠ sur sa carte, une explication au survol,
+  et une ligne récapitulative orange (« connection rate: 2 calls, reply rate: 2 prospects contacted… »).
+  Seuil : `performance_service.MIN_SAMPLE`.
+- **Filtre « Sales owner »** : limite tous les indicateurs (cartes, graphique, tableau par verticale)
+  aux prospects des commerciaux choisis, « Unassigned » compris. Il porte sur le commercial du
+  **prospect** : REVORA n'enregistre pas encore qui a saisi chaque interaction (phase 11) — c'est
+  indiqué dans l'aide et dans « How are these indicators calculated? ».
+- `compute_kpis` renvoie aussi `invited` (prospects invités sur LinkedIn), base du taux d'acceptation.
+- `performance_service` : `MIN_SAMPLE`, `low_volume_rates`, `owner_options`, `filter_by_owner`.
+
+### Tests
+- 292 tests (6 nouveaux). Vérifié dans le navigateur sur une **copie** de la base : icônes, ligne
+  d'alerte, filtre sur un commercial (2 appels → 1). `revora.db` n'a pas été modifiée.
+
+## [0.20.0] — 2026-11-15 — P2.2 : Activity, source et état des synchronisations
+
+### Ajouté
+- Activity › Timeline : filtre **« Source »** (Manual, HubSpot, Gmail, et toute autre source présente)
+  et colonne **« Source »** dans le tableau.
+- Ligne **« Sync: »** au-dessus des filtres : état de chaque connecteur tel qu'il est enregistré
+  (« not connected » en gris, « last sync 15/11 13:04 » en vert, « error: … » en rouge), avec un
+  raccourci vers Settings. Rien n'est supposé : sans synchronisation enregistrée, c'est « not connected ».
+- `activity_service` : `SOURCE_LABELS`, `source_label`, `source_options`, `filter_by_source`, `sync_status`.
+
+### Modifié
+- `timeline_service` réutilise `SOURCE_LABELS` d'`activity_service` (une seule définition).
+
+### Tests
+- 286 tests (5 nouveaux). Vérifié dans le navigateur sur une **copie** de la base (un appel manuel,
+  un email Gmail fictif, une erreur Gmail simulée) : filtre, couleurs d'état et raccourci Settings.
+  `revora.db` n'a pas été modifiée.
+
+## [0.19.0] — 2026-11-15 — P2.1 : Objections reliées à leur échange
+
+### Ajouté
+- Fiche prospect › **Record an objection** : champ facultatif **« Raised during »** pour relier
+  l'objection à l'un des 10 derniers échanges du prospect. L'objection prend alors la date de cet
+  échange (et non l'heure de saisie), ce qui rend les statistiques par semaine exactes.
+- Objections › **Log** : colonne **« Raised during »** (ex. « Call · 15/11 13:04 · Discovery ») et
+  **catégorie corrigeable** directement dans le tableau, comme le statut.
+- Timeline de la fiche : l'objection indique « during Call » quand elle est reliée.
+- `database.set_objection_category`, `objection_service.change_category`, `interaction_label`,
+  `source_interaction` ; `get_objections` renvoie aussi le canal, le sujet et la date de l'échange d'origine.
+
+### Corrigé
+- Objections : après une modification dans le journal, la page revenait sur l'onglet Insights ;
+  elle reste désormais sur **Log** (`on_change="rerun"` sur les onglets).
+
+### Sécurité des données
+- Un échange d'un **autre** prospect est refusé (« Cet échange n'appartient pas à ce prospect. »).
+
+### Tests
+- 281 tests (6 nouveaux). Vérifié dans le navigateur sur une **copie** de la base : appel saisi,
+  objection reliée, catégorie corrigée puis rétablie. `revora.db` n'a pas été modifiée.
+
+## 2026-11-15 — Dépôt GitHub
 
 ### Ajouté
 - Dépôt distant `origin` : https://github.com/enzomangiaracina-design/revora (public, choix validé).
