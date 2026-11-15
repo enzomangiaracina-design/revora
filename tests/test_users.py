@@ -142,3 +142,23 @@ def test_manager_sees_everyone_and_choice_is_shared(temp_db):
     assert not at.exception
     assert at.segmented_control(key="overview_scope").value == MINE
     assert any("No prospect assigned to you yet" in m.value for m in at.markdown)
+
+
+# ---------- Phase 11.3 : Performance selon le rôle ----------
+
+def test_performance_defaults_to_own_figures_for_sdr(temp_db):
+    ids = _team_with_prospects()
+    at = AppTest.from_file(MAIN, default_timeout=60).run()
+    menu = next(s for s in at.sidebar.selectbox if s.label == "Signed in as")
+
+    menu.select(ids["Léa Martin"]).run()
+    at.sidebar.radio[0].set_value("Performance").run()
+    assert not at.exception
+    assert at.multiselect(key="performance_owners").value == ["Léa Martin"]
+    assert any("shown to managers" in c.value for c in at.caption)
+
+    menu = next(s for s in at.sidebar.selectbox if s.label == "Signed in as")   # élément de la page actuelle
+    menu.select(ids["Nina Roy"]).run()                                   # un manager : toute l'équipe
+    assert not at.exception
+    assert at.multiselect(key="performance_owners").value == []
+    assert any("By sales owner" in m.value for m in at.markdown)

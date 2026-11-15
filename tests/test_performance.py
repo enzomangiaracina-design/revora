@@ -143,3 +143,28 @@ def test_filter_by_owner_on_interactions_and_prospects():
 
 def test_compute_kpis_exposes_invited_sample():
     assert perf.compute_kpis([], [], date(2026, 11, 1), date(2026, 11, 14))["invited"] == 0
+
+
+# ---------- Phase 11.3 : vue équipe ----------
+
+def test_by_owner_compares_reps_and_flags_low_volume():
+    from core.performance_service import by_owner
+
+    prospects = [{"id": 1, "owner": "Léa"}, {"id": 2, "owner": "Léa"}, {"id": 3, "owner": "Hugo"},
+                 {"id": 4, "owner": None}]
+    interactions = [
+        {"contact_id": 1, "channel": "Call", "direction": "Outbound", "event_type": "Meeting booked",
+         "occurred_at_local": "2026-11-10 10:00:00"},
+        {"contact_id": 3, "channel": "Email", "direction": "Outbound", "event_type": "Completed",
+         "occurred_at_local": "2026-11-11 10:00:00"},
+    ]
+    objections = [{"contact_id": 3, "occurred_at_local": "2026-11-11 11:00:00"}]
+
+    rows = by_owner(interactions, objections, prospects, date(2026, 11, 1), date(2026, 11, 15))
+
+    assert [r["Sales owner"] for r in rows] == ["Léa", "Hugo", "Unassigned"]   # réunions d'abord
+    lea, hugo, unassigned = rows
+    assert (lea["Prospects"], lea["Calls"], lea["Meetings"], lea["Conversion (%)"]) == (2, 1, 1, 100)
+    assert "conversion rate" in lea["Low volume"]                              # 1 seul prospect contacté
+    assert (hugo["Emails sent"], hugo["Objections"], hugo["Meetings"]) == (1, 1, 0)
+    assert unassigned["Contacted"] == 0 and unassigned["Low volume"] == ""

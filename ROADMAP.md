@@ -100,7 +100,8 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 
 ## Module H — Performance ✅ (avant la phase 9)
 - ✅ Indicateurs individuels, comparaison de périodes, activité quotidienne, par verticale
-- ⬜ Par séquence (avec HubSpot), vues manager / équipe (phase 11)
+- ✅ Vues manager / équipe (v0.34.0)
+- ⬜ Par séquence (avec HubSpot)
 
 ## Phase 9 — LinkedIn ✅ (saisie manuelle, conforme)
 - ✅ Vérification des API officielles et des conditions d'utilisation (`docs/LINKEDIN.md`)
@@ -119,10 +120,10 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ `seed_demo.py` : 20 prospects fictifs et leur historique dans `demo.db`, base séparée
 - ✅ `REVORA_DATABASE=demo.db` pour lancer l'application dessus, bandeau « Demo database »
 
-## Phase 11 — Multi-utilisateur 🟡
+## Phase 11 — Multi-utilisateur ✅ (prototype, sans mot de passe)
 - ✅ 11.1 Équipe (rôles SDR / Manager, actif / inactif), menu « Signed in as », propriétaire choisi
   dans l'équipe (v0.32.0) — sans mot de passe pour l'instant
 - ✅ 11.2 « My prospects » : Overview, liste et pipeline limités à l'utilisateur actif (v0.33.0)
-- ⬜ 11.3 Vues manager / équipe dans Performance
+- ✅ 11.3 Vue équipe « By sales owner » (managers) et performance personnelle par défaut (SDR) (v0.34.0)
 - ⬜ Vraie connexion (identifiants) : avec l'hébergement, phase 12
 ## Phase 12 — Production (PostgreSQL, hébergement, sécurité, monitoring) ⬜

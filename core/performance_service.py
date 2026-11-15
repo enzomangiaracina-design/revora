@@ -317,3 +317,42 @@ def filter_by_owner(items, prospects, owners):
     key = "contact_id" if items and "contact_id" in items[0] else "id"
 
     return [item for item in items if owner_of.get(item[key]) in owners]
+
+
+# ==========================================
+# PHASE 11.3 : VUE ÉQUIPE (PAR COMMERCIAL)
+# ==========================================
+
+def by_owner(all_interactions, objections, prospects, start, end, minimum=MIN_SAMPLE):
+    """Indicateurs par commercial (propriétaire du prospect), pour comparer l'équipe.
+
+    Une ligne par commercial ayant au moins un prospect, puis « Unassigned ».
+    "Low volume" liste les taux calculés sur moins de `minimum` données : à ne pas
+    comparer. Rappel : le commercial est celui du PROSPECT, pas l'auteur de l'échange.
+    """
+
+    rows = []
+
+    for owner in owner_options(prospects):
+        owned = filter_by_owner(prospects, prospects, [owner])
+        kpis = compute_kpis(filter_by_owner(all_interactions, prospects, [owner]),
+                            filter_by_owner(objections, prospects, [owner]), start, end)
+        fragile = low_volume_rates(kpis, minimum)
+
+        rows.append({
+            "Sales owner": owner,
+            "Prospects": len(owned),
+            "Contacted": kpis["contacted"],
+            "Calls": kpis["calls"],
+            "Connection rate (%)": kpis["connection_rate"],
+            "Emails sent": kpis["emails_sent"],
+            "Reply rate (%)": kpis["reply_rate"],
+            "Meetings": kpis["meetings"],
+            "Conversion (%)": kpis["conversion_rate"],
+            "Objections": kpis["objections"],
+            "Low volume": ", ".join(text.split(":")[0] for text in fragile.values()) or "",
+        })
+
+    # Les plus actifs d'abord ; « Unassigned » toujours en dernier
+    return sorted(rows, key=lambda r: (r["Sales owner"] == UNASSIGNED, -r["Meetings"], -r["Contacted"],
+                                       r["Sales owner"].casefold()))

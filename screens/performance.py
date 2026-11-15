@@ -31,12 +31,21 @@ def render(ctx):
     owners = owner_options(prospects)
     selected_owners = []
 
+    # Phase 11.3 : à chaque changement d'utilisateur, filtre par défaut selon le rôle
+    # (un SDR voit SA performance, un manager toute l'équipe). Modifiable ensuite.
+    user_id = ctx.user["id"] if ctx.user else None
+    if st.session_state.get("_performance_user") != user_id:
+        st.session_state["_performance_user"] = user_id
+        st.session_state["performance_owners"] = [
+            o for o in owners if ctx.user and ctx.user["role"] == "SDR" and o.casefold() == ctx.user["name"].casefold()
+        ]
+
     if owners:
         col_owner, _ = st.columns([2, 3])
         selected_owners = col_owner.multiselect(
             "Sales owner", owners, key="performance_owners", placeholder="All sales owners",
             help="Filters on the prospect's sales owner. Who logged each interaction "
-                 "is not recorded yet (multi-user: phase 11).",
+                 "is not recorded yet.",
         )
 
     prospects = filter_by_owner(prospects, prospects, selected_owners)
@@ -120,6 +129,27 @@ def render(ctx):
             [LOG_ACTIVITY], icon=":material/bar_chart:", key="performance_daily_empty",
         )
 
+    # ---------- Phase 11.3 : VUE ÉQUIPE (managers, ou personne de connecté) ----------
+
+    if ctx.user and ctx.user["role"] == "SDR":
+        st.caption("The comparison by sales owner is shown to managers.")
+    else:
+        st.markdown("**By sales owner**")
+        team_rows = by_owner(get_all_interactions(), get_objections(), ctx.prospects, start, end)
+
+        if any(row["Contacted"] or row["Meetings"] for row in team_rows):
+            st.dataframe(pd.DataFrame(team_rows), width="stretch", hide_index=True)
+            st.caption(
+                "Whole team, whatever the Sales owner filter above. Each prospect counts for its sales owner. "
+                f"Rates listed under « Low volume » rest on fewer than {MIN_SAMPLE} data points: do not compare them."
+            )
+        else:
+            empty_state(
+                "No sales owner activity in this period",
+                "Assign prospects to your team (Sales owner) and log activity: each rep gets a row here.",
+                [LOG_ACTIVITY], icon=":material/groups:", key="performance_team_empty",
+            )
+
     st.markdown("**By vertical**")
     vertical_rows = by_vertical(all_interactions, all_objections, prospects, start, end)
 
@@ -146,7 +176,8 @@ def render(ctx):
             "- A rate shows **—** when there is nothing to divide (never a misleading 0 %).\n"
             f"- **Low volume**: a rate based on fewer than {MIN_SAMPLE} calls, contacted or invited "
             "prospects is flagged: it is too fragile to compare.\n"
-            "- **Sales owner** filter: uses the prospect's owner, not who logged the interaction.\n"
+            "- **Sales owner** filter and **By sales owner** table: use the prospect's owner, not who "
+            "logged the interaction. Signed in as an SDR, the filter starts on your own prospects.\n"
             "- **Performance by sequence** is not available yet: REVORA has no sequences "
             "(planned with the HubSpot connection)."
         )

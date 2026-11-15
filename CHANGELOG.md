@@ -1,5 +1,22 @@
 # CHANGELOG — REVORA
 
+## [0.34.0] — 2026-11-15 — Phase 11.3 : vue équipe dans Performance
+
+### Ajouté
+- Performance › **By sales owner** : une ligne par commercial (puis « Unassigned ») avec prospects,
+  contactés, appels, taux de connexion, emails, taux de réponse, réunions, conversion, objections.
+  - Colonne **Low volume** : les taux calculés sur moins de 10 données, à ne pas comparer.
+  - Toujours sur toute l'équipe, quel que soit le filtre « Sales owner ».
+  - Affiché aux **managers** (et quand personne n'est choisi dans « Signed in as ») ; un SDR voit
+    « The comparison by sales owner is shown to managers ».
+- Connecté en **SDR**, le filtre « Sales owner » de Performance part sur ses propres prospects
+  (modifiable) ; en manager, sur toute l'équipe. Réinitialisé à chaque changement d'utilisateur.
+- `performance_service.by_owner`.
+
+### Tests
+- 375 tests (2 nouveaux). Vérifié dans le navigateur sur une copie de `demo.db` : Nina (manager) voit
+  Léa, Hugo et Unassigned ; Léa (SDR) voit ses chiffres (9 appels, identiques à sa ligne d'équipe).
+
 ## [0.33.0] — 2026-11-15 — Phase 11.2 : « My prospects »
 
 ### Ajouté
