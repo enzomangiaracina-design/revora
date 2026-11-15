@@ -221,6 +221,19 @@ def initialize_database():
         )
     """)
 
+    # « PAS MAINTENANT » (P1) : un prospect ecarte du Today's Focus jusqu'a une date,
+    # par decision du commercial (corriger ou rejeter une priorite proposee).
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS focus_snoozes (
+            contact_id INTEGER PRIMARY KEY,
+            until TEXT NOT NULL,
+            reason TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (contact_id) REFERENCES contacts(id)
+        )
+    """)
+
     # REPONSES RECOMMANDEES par categorie (redigees par le commercial)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS objection_responses (
@@ -686,7 +699,7 @@ def delete_prospect(contact_id):
         deleted = {}
 
         # Les objections d'abord : elles referencent les interactions
-        for table in ("objections", "interactions", "tasks", "scores", "stage_changes"):
+        for table in ("objections", "interactions", "tasks", "scores", "stage_changes", "focus_snoozes"):
             deleted[table] = connection.execute(
                 f"DELETE FROM {table} WHERE contact_id = ?",
                 (contact_id,)
@@ -1681,7 +1694,19 @@ def get_activity_summary():
 
             (SELECT t.title FROM tasks t
              WHERE t.contact_id = contacts.id AND t.status = 'A faire'
-             ORDER BY t.due_at IS NULL, t.due_at LIMIT 1) AS next_task_title
+             ORDER BY t.due_at IS NULL, t.due_at LIMIT 1) AS next_task_title,
+
+            (SELECT t.id FROM tasks t
+             WHERE t.contact_id = contacts.id AND t.status = 'A faire'
+             ORDER BY t.due_at IS NULL, t.due_at LIMIT 1) AS next_task_id,
+
+            (SELECT datetime(t.created_at, 'localtime') FROM tasks t
+             WHERE t.contact_id = contacts.id AND t.status = 'A faire'
+             ORDER BY t.due_at IS NULL, t.due_at LIMIT 1) AS next_task_created_at,
+
+            (SELECT i.channel FROM interactions i
+             WHERE i.contact_id = contacts.id
+             ORDER BY i.occurred_at DESC, i.id DESC LIMIT 1) AS last_channel
 
         FROM contacts
         """
@@ -1806,6 +1831,70 @@ def get_all_tasks():
 # ==========================================
 # 10. TERMINER UNE RELANCE
 # ==========================================
+
+def reschedule_task(task_id, due_at):
+    """Reporte une relance a une nouvelle echeance ("AAAA-MM-JJ")."""
+
+    connection = get_connection()
+
+    try:
+        connection.execute("UPDATE tasks SET due_at = ? WHERE id = ?", (due_at, task_id))
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def snooze_prospect(contact_id, until, reason=None):
+    """Ecarte un prospect du Today's Focus jusqu'a une date ("AAAA-MM-JJ") incluse."""
+
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            """
+            INSERT INTO focus_snoozes (contact_id, until, reason, created_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(contact_id) DO UPDATE SET
+                until = excluded.until, reason = excluded.reason, created_at = CURRENT_TIMESTAMP
+            """,
+            (contact_id, until, _clean(reason))
+        )
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def unsnooze_prospect(contact_id=None):
+    """Remet un prospect (ou tous si contact_id est None) dans le Today's Focus."""
+
+    connection = get_connection()
+
+    try:
+        if contact_id is None:
+            connection.execute("DELETE FROM focus_snoozes")
+        else:
+            connection.execute("DELETE FROM focus_snoozes WHERE contact_id = ?", (contact_id,))
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def get_active_snoozes(today):
+    """Prospects ecartes dont la date de fin n'est pas depassee : {contact_id: {...}}."""
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        "SELECT * FROM focus_snoozes WHERE until >= ?", (today,)
+    ).fetchall()
+
+    connection.close()
+
+    return {row["contact_id"]: dict(row) for row in rows}
+
 
 def complete_task(task_id):
     """Marque une relance comme terminee."""

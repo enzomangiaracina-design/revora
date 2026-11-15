@@ -1,5 +1,32 @@
 # CHANGELOG — REVORA
 
+## [0.18.0] — 2026-11-15 — P1 : Cockpit SDR (Today's Focus enrichi)
+
+### Ajouté
+- Chaque ligne du **Today's Focus** affiche :
+  - le **type d'action** (Follow up, Call, Email, LinkedIn, Prepare), déduit des données : relance due,
+    sinon canal du dernier échange, sinon téléphone puis email disponibles (« Prepare » s'il n'y a ni l'un ni l'autre) ;
+  - l'**échéance** (« Overdue 2 d » en rouge, « Today » en orange, « Due 30/11 ») et le dernier contact ;
+  - une **raison vérifiable avec source et date** : « Follow-up due 13/11 (scheduled 10/11) »,
+    « Never contacted · added 01/11 via Import CSV », « No touch for 25 d · last call on 21/10 ».
+- **Actions rapides** : ouvrir la fiche, **terminer** la relance due, **reporter** la relance (+1 j, +3 j,
+  +1 semaine), **« Not now »** : écarter un prospect du focus jusqu'à une date, avec raison facultative
+  (correction d'une priorité proposée). Les prospects écartés reviennent automatiquement à la date prévue ;
+  « Show them again » les remet tout de suite.
+- Base : table `focus_snoozes` ; `reschedule_task`, `snooze_prospect`, `unsnooze_prospect`,
+  `get_active_snoozes` ; le résumé d'activité donne aussi l'id et la date de création de la prochaine
+  relance et le canal du dernier échange. Suppression d'un prospect : sa mise à l'écart part avec lui.
+- 21 nouveaux tests (275 au total), dont 5 tests d'interface qui cliquent sur les actions rapides.
+
+### Non fait (volontairement)
+- « Préparer un brouillon » (blueprint) : nécessite l'IA (phase 10 / P3).
+
+### Tests effectués
+- `python3 -m pytest` : 275 tests réussis ; `revora.db` inchangée.
+- Navigateur sur une copie (4 prospects fictifs : relance en retard, relance du jour, jamais contacté,
+  inactif) : lignes, couleurs d'échéance, menu « Plus tard » ; boutons empilés → colonne élargie.
+- Sauvegarde préalable : `backups/20261115-083847/`. Migration : table `focus_snoozes`.
+
 ## [0.17.0] — 2026-11-15 — P0.4 : états vides et erreurs communs
 
 ### Ajouté

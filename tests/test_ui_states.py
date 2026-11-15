@@ -93,3 +93,80 @@ def test_streamlit_reruns_are_not_caught_by_the_error_guard(thomas):
     assert not at.exception
     assert "This page hit an unexpected error" not in texts(at)
     assert any("succes" in s.value for s in at.success)
+
+
+# ---------- P1 : actions rapides du Today's Focus ----------
+
+from datetime import date, timedelta
+
+import database
+
+
+@pytest.fixture
+def focus_data(temp_db):
+    """Deux prospects : Paul (relance en retard) et Lina (jamais contactée)."""
+
+    database.create_prospect("Paul", "Roux", "Fintra", "Finance", "paul@x.example", "0611", None)
+    database.create_prospect("Lina", "Faure", "Medivia", "Santé", "lina@x.example", None, None)
+    ids = {p["first_name"]: p["id"] for p in database.get_all_prospects()}
+    database.create_task(ids["Paul"], "Envoyer la proposition", "",
+                         (date.today() - timedelta(days=2)).isoformat())
+    return ids
+
+
+def focus_names(at):
+    return [m.value for m in at.markdown if "**" in m.value and ("Paul Roux" in m.value or "Lina Faure" in m.value)]
+
+
+def test_focus_rows_show_type_due_and_reason(focus_data):
+    at = open_page("Overview")
+    content = texts(at)
+
+    assert "Follow-up: Envoyer la proposition" in content
+    assert "Overdue 2 d" in content
+    assert "Why: Follow-up due" in content
+    assert "First contact: email" in content          # Lina : pas de téléphone, un email
+    assert "Why: Never contacted · added" in content
+
+
+def test_done_completes_the_follow_up(focus_data):
+    at = open_page("Overview")
+    at.button(key=f"focus_done_{focus_data['Paul']}").click().run()
+
+    assert [t["status"] for t in database.get_tasks(focus_data["Paul"])] == ["Terminee"]
+    assert any("Follow-up completed" in s.value for s in at.success)
+
+
+def test_postpone_moves_the_due_date(focus_data):
+    at = open_page("Overview")
+    at.button(key=f"focus_postpone_{focus_data['Paul']}_3").click().run()
+
+    due = database.get_tasks(focus_data["Paul"])[0]["due_at"]
+    assert due == (date.today() + timedelta(days=3)).isoformat()
+    # Plus de relance en retard : Paul reste prioritaire uniquement parce qu'il n'a jamais été contacté
+    content = texts(at)
+    assert "Overdue" not in content
+    assert "First contact: call" in content
+    assert f"Due {(date.today() + timedelta(days=3)).strftime('%d/%m')}" in content
+
+
+def test_not_now_sets_aside_then_restore(focus_data):
+    at = open_page("Overview")
+    at.text_input(key=f"focus_reason_{focus_data['Lina']}").set_value("En congés")
+    at.button(key=f"focus_aside_{focus_data['Lina']}_7").click().run()
+
+    snooze = database.get_active_snoozes(date.today().isoformat())[focus_data["Lina"]]
+    assert snooze["reason"] == "En congés"
+    assert snooze["until"] == (date.today() + timedelta(days=7)).isoformat()
+    assert not any("Lina Faure" in name for name in focus_names(at))
+    assert "1 prospect(s) set aside" in texts(at)
+
+    at.button(key="focus_restore").click().run()
+    assert database.get_active_snoozes(date.today().isoformat()) == {}
+    assert any("Lina Faure" in name for name in focus_names(at))
+
+
+def test_expired_snooze_is_ignored(focus_data):
+    database.snooze_prospect(focus_data["Lina"], (date.today() - timedelta(days=1)).isoformat())
+
+    assert database.get_active_snoozes(date.today().isoformat()) == {}

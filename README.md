@@ -6,7 +6,7 @@ REVORA est un espace de travail de prospection pour SDR/BDR : il mémorise les
 interactions (appels, emails, notes), organise le portefeuille de prospects et
 aide à décider quelle action effectuer ensuite.
 
-Statut : **prototype local** (Streamlit + SQLite), version 0.17.0.
+Statut : **prototype local** (Streamlit + SQLite), version 0.18.0.
 
 ## Lancer l'application
 
@@ -87,7 +87,7 @@ git add -A && git commit -m "Description de la modification"
 
 | Module | État |
 |---|---|
-| Overview | Cockpit du SDR : KPI du jour, Today's focus (priorités expliquées), activité récente, résumé 7 jours |
+| Overview | Cockpit du SDR : KPI du jour, Today's focus (type d'action, échéance, raison sourcée, actions rapides), activité récente, résumé 7 jours |
 | Prospects | Fonctionnel : recherche, filtres, création, modification, suppression confirmée, import CSV |
 | Prospect Details | Fonctionnel : coordonnées, compteurs, dernière interaction, prochaine action, saisie d'interactions, timeline, relances |
 | Activity | Fonctionnel : indicateurs du jour, timeline globale filtrable, relances par échéance, saisie rapide |

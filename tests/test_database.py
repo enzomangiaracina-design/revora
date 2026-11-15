@@ -168,7 +168,7 @@ def test_delete_prospect_removes_linked_data(thomas):
     deleted = database.delete_prospect(thomas)
 
     assert deleted == {"objections": 1, "interactions": 1, "tasks": 1, "scores": 0,
-                       "stage_changes": 0, "contacts": 1}
+                       "stage_changes": 0, "focus_snoozes": 0, "contacts": 1}
     assert database.get_objections() == []
     assert database.get_prospect_by_id(thomas) is None
     assert database.get_interactions(thomas) == []

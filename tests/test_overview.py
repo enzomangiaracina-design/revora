@@ -27,25 +27,71 @@ def test_priority_label(points, label):
     assert overview.priority_label(points) == label
 
 
-@pytest.mark.parametrize("summary, expected", [
-    ({"next_task_title": "Envoyer la proposition", "next_task_due": "2026-11-12",
-      "last_interaction_at": "2026-11-10 09:00:00"}, "Follow-up: Envoyer la proposition"),
-    ({"next_task_title": "Démo", "next_task_due": "2026-11-15"}, "Follow-up: Démo"),
-    ({}, "First contact: call or email"),
-    ({"next_task_title": "Plus tard", "next_task_due": "2026-11-30",
-      "last_interaction_at": "2026-10-26 09:00:00"}, "Re-engage: no touch for 20 days"),
+def item(summary=None, **prospect):
+    return {"prospect": {"id": 1, **prospect}, "summary": summary or {}, "points": 1, "reasons": []}
+
+
+OVERDUE = {"next_task_title": "Envoyer la proposition", "next_task_due": "2026-11-12",
+           "next_task_created_at": "2026-11-10 09:00:00", "next_task_id": 7,
+           "last_interaction_at": "2026-11-10 10:00:00", "last_channel": "Call"}
+
+
+@pytest.mark.parametrize("summary, prospect, expected", [
+    (OVERDUE, {}, "Follow up"),
+    ({}, {"phone": "0611", "email": "a@b.c"}, "Call"),
+    ({}, {"email": "a@b.c"}, "Email"),
+    ({}, {}, "Prepare"),
+    ({"last_interaction_at": "2026-10-26 09:00:00", "last_channel": "LinkedIn"}, {"phone": "0611"}, "LinkedIn"),
+    ({"last_interaction_at": "2026-10-26 09:00:00", "last_channel": "Note"}, {"email": "a@b.c"}, "Email"),
 ])
-def test_next_action_follows_the_reason(summary, expected):
-    assert overview.next_action({"summary": summary}, TODAY) == expected
+def test_action_type(summary, prospect, expected):
+    assert overview.action_type(item(summary, **prospect), TODAY) == expected
+
+
+@pytest.mark.parametrize("summary, prospect, expected", [
+    (OVERDUE, {}, "Follow-up: Envoyer la proposition"),
+    ({"next_task_title": "Démo", "next_task_due": "2026-11-15"}, {}, "Follow-up: Démo"),
+    ({}, {"phone": "0611"}, "First contact: call"),
+    ({}, {"email": "a@b.c"}, "First contact: email"),
+    ({}, {}, "Prepare: find a phone number or an email"),
+    ({"next_task_title": "Plus tard", "next_task_due": "2026-11-30",
+      "last_interaction_at": "2026-10-26 09:00:00", "last_channel": "Email"}, {}, "Re-engage by email: no touch for 20 days"),
+])
+def test_next_action_follows_the_reason(summary, prospect, expected):
+    assert overview.next_action(item(summary, **prospect), TODAY) == expected
+
+
+@pytest.mark.parametrize("summary, expected", [
+    (OVERDUE, ("Overdue 3 d", "overdue")),
+    ({"next_task_title": "Démo", "next_task_due": "2026-11-15"}, ("Today", "today")),
+    ({"next_task_title": "Plus tard", "next_task_due": "2026-11-30"}, ("Due 30/11", "later")),
+    ({}, ("—", "none")),
+])
+def test_due_label(summary, expected):
+    assert overview.due_label(item(summary), TODAY) == expected
+
+
+@pytest.mark.parametrize("summary, prospect, expected", [
+    (OVERDUE, {}, "Follow-up due 12/11 (scheduled 10/11)"),
+    ({}, {"created_at_local": "2026-11-01 09:00:00", "source": "Import CSV"},
+     "Never contacted · added 01/11 via Import CSV"),
+    ({"next_task_title": "Démo", "next_task_due": "2026-11-15"}, {"created_at_local": "2026-11-14 09:00:00"},
+     "Follow-up due 15/11 · Never contacted · added 14/11"),
+    ({"last_interaction_at": "2026-10-21 10:19:00", "last_channel": "Call"}, {},
+     "No touch for 25 d · last call on 21/10"),
+])
+def test_reason_detail_gives_source_and_date(summary, prospect, expected):
+    assert overview.reason_detail(item(summary, **prospect), TODAY) == expected
 
 
 def test_focus_rows():
     ranked = [
         {"prospect": {"id": 1, "first_name": "Ana", "last_name": "Lopez", "company_name": "Zeta",
-                      "status": "En contact"},
+                      "status": "En contact", "phone": "0611"},
          "points": 3, "reasons": ["Overdue follow-up (2026-11-12): Rappel"],
-         "summary": {"next_task_title": "Rappel", "next_task_due": "2026-11-12",
-                     "last_interaction_at": "2026-11-14 16:20:00"}},
+         "summary": {"next_task_title": "Rappel", "next_task_due": "2026-11-12", "next_task_id": 4,
+                     "next_task_created_at": "2026-11-09 08:00:00",
+                     "last_interaction_at": "2026-11-14 16:20:00", "last_channel": "Call"}},
         {"prospect": {"id": 2, "first_name": "Bob", "last_name": "Ray", "company_name": None,
                       "status": "A prospecter"},
          "points": 1, "reasons": ["Never contacted"], "summary": {}},
@@ -56,9 +102,12 @@ def test_focus_rows():
     assert rows[0] == {
         "id": 1, "priority": "High", "prospect": "Ana Lopez", "company": "Zeta", "stage": "En contact",
         "score": 56, "temperature": "Warm", "last_interaction": "Yesterday 16:20",
-        "next_action": "Follow-up: Rappel", "reason": "Overdue follow-up (2026-11-12): Rappel",
+        "action_type": "Follow up", "next_action": "Follow-up: Rappel",
+        "due": "Overdue 3 d", "due_state": "overdue",
+        "reason": "Follow-up due 12/11 (scheduled 09/11)", "task_id": 4, "task_title": "Rappel",
     }
     assert (rows[1]["company"], rows[1]["score"], rows[1]["last_interaction"]) == ("—", None, "Never")
+    assert (rows[1]["action_type"], rows[1]["due"], rows[1]["task_id"]) == ("Prepare", "—", None)
     assert len(overview.focus_rows(ranked, {}, limit=1, today=TODAY)) == 1
 
 

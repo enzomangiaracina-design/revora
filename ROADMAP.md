@@ -76,6 +76,11 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ P0.3 Fiche prospect 360° : en-tête, timeline unifiée, historique des changements d'étape (v0.16.0)
 - ✅ P0.4 États vides / erreur communs à toutes les pages (v0.17.0)
 
+## P1 — Cockpit SDR (blueprint) ✅
+- ✅ Today's Focus : type d'action, échéance, raison avec source et date (v0.18.0)
+- ✅ Actions rapides : ouvrir, terminer, reporter, « Not now » (mise à l'écart datée)
+- ⬜ Brouillons d'emails / préparation assistée : avec l'IA (P3)
+
 ## Overview — cockpit du SDR ✅
 - ✅ KPI du jour, Today's focus explicable, fil d'activité, résumé 7 jours, états vides, mobile
 - ⬜ Historique des changements d'étape (pour les afficher dans le fil d'activité)

@@ -3,6 +3,41 @@
 from screens.common import *  # noqa: F401,F403
 from screens.shared import *  # noqa: F401,F403
 
+from database import get_active_snoozes, reschedule_task, snooze_prospect, unsnooze_prospect
+
+ACTION_ICONS = {
+    "Follow up": ":material/event:", "Call": ":material/call:", "Email": ":material/mail:",
+    "LinkedIn": ":material/work:", "Prepare": ":material/assignment:",
+}
+
+DUE_COLORS = {"overdue": "red", "today": "orange"}
+
+LATER = [("+1 day", 1), ("+3 days", 3), ("+1 week", 7)]
+
+
+# ---------- Actions rapides du Today's Focus (callbacks) ----------
+
+def _complete(task_id, title):
+    complete_task(task_id)
+    st.session_state["flash"] = f"Follow-up completed: {title}"
+
+
+def _postpone(task_id, title, days):
+    new_due = (date.today() + timedelta(days=days)).isoformat()
+    reschedule_task(task_id, new_due)
+    st.session_state["flash"] = f"Follow-up « {title} » moved to {new_due}."
+
+
+def _set_aside(contact_id, name, days, reason_key):
+    until = (date.today() + timedelta(days=days)).isoformat()
+    snooze_prospect(contact_id, until, st.session_state.get(reason_key))
+    st.session_state["flash"] = f"{name} set aside from Today's focus until {until}."
+
+
+def _restore_all():
+    unsnooze_prospect()
+    st.session_state["flash"] = "All prospects set aside are back in Today's focus."
+
 
 def render(ctx):
     """Affiche la page « Overview »."""
@@ -62,10 +97,14 @@ def render(ctx):
 
     task_groups = group_tasks(get_all_tasks(), today)
     stale_days = st.session_state.get("stale_days", DEFAULT_STALE_DAYS)
-    ranked = prioritize(
+    ranked_all = prioritize(
         prospects, stages, summaries, stale_days,
         scores={pid: result["global"] for pid, result in scores.items()},
     )
+
+    # « Pas maintenant » : les prospects mis de côté par le commercial sortent du focus
+    set_aside = get_active_snoozes(today.isoformat())
+    ranked = [item for item in ranked_all if item["prospect"]["id"] not in set_aside]
 
     def vs_yesterday(key):
         change = delta(today_kpis[key], yesterday_kpis[key])
@@ -112,8 +151,8 @@ def render(ctx):
         for row in rows:
             with st.container(border=True):
 
-                col_who, col_last, col_action, col_open = st.columns(
-                    [3, 1.3, 3.4, 0.5], vertical_alignment="center"
+                col_who, col_action, col_when, col_buttons = st.columns(
+                    [2.3, 3.2, 1.2, 1.9], vertical_alignment="center"
                 )
 
                 col_who.markdown(f"{PRIORITY_BADGES[row['priority']]} **{row['prospect']}**")
@@ -122,17 +161,63 @@ def render(ctx):
                     + (f" · score {row['score']}" if row["score"] is not None else "")
                 )
 
-                col_last.caption("Last touch")
-                col_last.markdown(row["last_interaction"])
-
-                col_action.markdown(f"**{row['next_action']}**")
+                # Quoi faire, et pourquoi (raison vérifiable : source et date)
+                col_action.markdown(
+                    f"{ACTION_ICONS.get(row['action_type'], ':material/bolt:')} **{row['next_action']}**"
+                )
                 col_action.caption(f"Why: {row['reason']}")
 
-                col_open.button(
-                    "", icon=":material/open_in_new:", key=f"focus_open_{row['id']}",
-                    on_click=open_prospect, args=(row["id"],),
-                    help=f"Open {row['prospect']}'s prospect file",
-                )
+                # Quand
+                color = DUE_COLORS.get(row["due_state"])
+                col_when.markdown(f":{color}[{row['due']}]" if color else row["due"])
+                col_when.caption(f"Last touch: {row['last_interaction']}")
+
+                # Actions rapides : ouvrir, terminer, plus tard
+                with col_buttons.container(horizontal=True, gap="small"):
+                    st.button(
+                        "", icon=":material/open_in_new:", key=f"focus_open_{row['id']}",
+                        on_click=open_prospect, args=(row["id"],),
+                        help=f"Open {row['prospect']}'s prospect file",
+                    )
+
+                    if row["task_id"] and row["due_state"] in ("overdue", "today"):
+                        st.button(
+                            "", icon=":material/check:", key=f"focus_done_{row['id']}",
+                            on_click=_complete, args=(row["task_id"], row["task_title"]),
+                            help=f"Mark « {row['task_title']} » as done",
+                        )
+
+                    with st.popover("", icon=":material/schedule:", help="Later: postpone or set aside",
+                                    key=f"focus_later_{row['id']}"):
+
+                        if row["task_id"]:
+                            st.caption(f"Postpone « {row['task_title']} »")
+                            with st.container(horizontal=True):
+                                for label, days in LATER:
+                                    st.button(
+                                        label, key=f"focus_postpone_{row['id']}_{days}",
+                                        on_click=_postpone, args=(row["task_id"], row["task_title"], days),
+                                    )
+
+                        st.caption("Not now: set this prospect aside from Today's focus")
+                        reason_key = f"focus_reason_{row['id']}"
+                        st.text_input("Reason (optional)", key=reason_key,
+                                      placeholder="Example: on holiday until Monday")
+                        with st.container(horizontal=True):
+                            for label, days in LATER:
+                                st.button(
+                                    label, key=f"focus_aside_{row['id']}_{days}",
+                                    on_click=_set_aside, args=(row["id"], row["prospect"], days, reason_key),
+                                )
+
+        if set_aside:
+            col_note, col_restore = st.columns([3, 1], vertical_alignment="center")
+            col_note.caption(
+                f"{len(set_aside)} prospect(s) set aside with « Not now » "
+                "(they come back automatically when the date is reached)."
+            )
+            col_restore.button("Show them again", type="tertiary", icon=":material/undo:",
+                               on_click=_restore_all, key="focus_restore")
 
         if len(ranked) > len(rows):
             st.button(

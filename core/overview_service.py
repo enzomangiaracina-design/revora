@@ -49,23 +49,120 @@ def priority_label(points):
     return "Low"
 
 
+def _short(value):
+    """"2026-11-13" ou "2026-11-13 10:00:00" -> "13/11" ; vide -> "—"."""
+
+    return datetime.fromisoformat(str(value)[:10]).strftime("%d/%m") if value else "—"
+
+
+def _due_task(summary, today_iso):
+    """La prochaine relance si elle est due aujourd'hui ou en retard, sinon None."""
+
+    due = (summary.get("next_task_due") or "")[:10]
+
+    if summary.get("next_task_title") and due and due <= today_iso:
+        return due
+
+    return None
+
+
+def action_type(item, today=None):
+    """Type d'action (blueprint : appeler, email, préparer, relancer), déduit des données.
+
+      - relance due ou en retard            -> "Follow up"
+      - jamais contacté                     -> "Call" si téléphone, sinon "Email", sinon "Prepare"
+      - inactif                             -> canal du dernier échange (Call, Email, LinkedIn)
+    """
+
+    prospect = item.get("prospect") or {}
+    summary = item.get("summary") or {}
+    today_iso = (today or date.today()).isoformat()
+
+    if _due_task(summary, today_iso):
+        return "Follow up"
+
+    last_channel = summary.get("last_channel")
+
+    if summary.get("last_interaction_at") and last_channel in ("Call", "Email", "LinkedIn"):
+        return last_channel
+
+    if prospect.get("phone"):
+        return "Call"
+    if prospect.get("email"):
+        return "Email"
+    return "Prepare"
+
+
 def next_action(item, today=None):
     """Action recommandée, déduite uniquement de la raison de priorité."""
 
     summary = item.get("summary") or {}
-    title = summary.get("next_task_title")
-    due = (summary.get("next_task_due") or "")[:10]
     today_iso = (today or date.today()).isoformat()
 
-    if title and due and due <= today_iso:
-        return f"Follow-up: {title}"
+    if _due_task(summary, today_iso):
+        return f"Follow-up: {summary['next_task_title']}"
+
+    kind = action_type(item, today)
+    days = days_since(summary.get("last_interaction_at"), today)
+
+    if days is None:
+        return {
+            "Call": "First contact: call",
+            "Email": "First contact: email",
+        }.get(kind, "Prepare: find a phone number or an email")
+
+    return f"Re-engage by {kind.lower()}: no touch for {days} days"
+
+
+def due_label(item, today=None):
+    """Échéance lisible : (texte, état) avec état overdue / today / later / none."""
+
+    summary = item.get("summary") or {}
+    today = today or date.today()
+    due = (summary.get("next_task_due") or "")[:10]
+
+    if not summary.get("next_task_title") or not due:
+        return "—", "none"
+
+    late = (today - date.fromisoformat(due)).days
+
+    if late > 0:
+        return f"Overdue {late} d", "overdue"
+    if late == 0:
+        return "Today", "today"
+    return f"Due {_short(due)}", "later"
+
+
+def reason_detail(item, today=None):
+    """Raison de la priorité avec sa source et sa date (aucune déduction)."""
+
+    prospect = item.get("prospect") or {}
+    summary = item.get("summary") or {}
+    today_iso = (today or date.today()).isoformat()
+    parts = []
+
+    due = _due_task(summary, today_iso)
+    if due:
+        created = summary.get("next_task_created_at")
+        parts.append(
+            f"Follow-up due {_short(due)}" + (f" (scheduled {_short(created)})" if created else "")
+        )
 
     days = days_since(summary.get("last_interaction_at"), today)
 
     if days is None:
-        return "First contact: call or email"
+        added = prospect.get("created_at_local") or prospect.get("created_at")
+        text = "Never contacted"
+        if added:
+            text += f" · added {_short(added)}"
+        if prospect.get("source"):
+            text += f" via {prospect['source']}"
+        parts.append(text)
+    elif not due:
+        channel = (summary.get("last_channel") or "interaction").lower()
+        parts.append(f"No touch for {days} d · last {channel} on {_short(summary['last_interaction_at'])}")
 
-    return f"Re-engage: no touch for {days} days"
+    return " · ".join(parts) or " · ".join(item.get("reasons", []))
 
 
 def focus_rows(ranked, scores, limit=8, today=None):
@@ -77,6 +174,7 @@ def focus_rows(ranked, scores, limit=8, today=None):
         prospect = item["prospect"]
         summary = item.get("summary") or {}
         score = scores.get(prospect["id"]) or {}
+        due_text, due_state = due_label(item, today)
 
         rows.append({
             "id": prospect["id"],
@@ -87,8 +185,13 @@ def focus_rows(ranked, scores, limit=8, today=None):
             "score": score.get("global"),
             "temperature": score.get("temperature"),
             "last_interaction": format_when(summary.get("last_interaction_at"), today) or "Never",
+            "action_type": action_type(item, today),
             "next_action": next_action(item, today),
-            "reason": " · ".join(item["reasons"]),
+            "due": due_text,
+            "due_state": due_state,
+            "reason": reason_detail(item, today),
+            "task_id": summary.get("next_task_id"),
+            "task_title": summary.get("next_task_title"),
         })
 
     return rows
