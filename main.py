@@ -183,7 +183,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.13.0")
+st.sidebar.caption("VERSION 0.13.1")
 
 
 # ==========================================
@@ -204,8 +204,25 @@ def show_flash_message():
         st.success(message)
 
 
+def reset_form(form_key):
+    """Vide un formulaire prospect APRES une creation reussie.
+
+    Concept : Streamlit garde les valeurs d'un formulaire tant que son nom
+    (key) ne change pas. En ajoutant un numero de version au nom, on obtient
+    un formulaire neuf et vide. En cas d'erreur, on ne l'appelle pas : les
+    valeurs saisies restent la pour etre corrigees.
+    """
+
+    version_key = f"_form_version_{form_key}"
+    st.session_state[version_key] = st.session_state.get(version_key, 0) + 1
+
+
 def prospect_form(form_key, verticals, submit_label, defaults=None):
     """Formulaire prospect, vide (creation) ou pre-rempli (modification).
+
+    Les champs sont poses ligne par ligne (une paire de colonnes par ligne)
+    pour que la touche Tab suive l'ordre de lecture : Prenom -> Nom ->
+    Entreprise -> Verticale...
 
     Retourne (bouton_clique, donnees_saisies).
     """
@@ -220,12 +237,17 @@ def prospect_form(form_key, verticals, submit_label, defaults=None):
     if defaults.get("status") and defaults["status"] not in status_options:
         status_options.append(defaults["status"])
 
-    with st.form(form_key, clear_on_submit=not defaults):
+    version = st.session_state.get(f"_form_version_{form_key}", 0)
+
+    # clear_on_submit=False : une erreur de validation ne doit pas effacer la saisie
+    with st.form(f"{form_key}_{version}", clear_on_submit=False):
 
         col1, col2 = st.columns(2)
 
         first_name = col1.text_input("First name *", value=defaults.get("first_name") or "")
         last_name = col2.text_input("Last name *", value=defaults.get("last_name") or "")
+
+        col1, col2 = st.columns(2)
 
         company_name = col1.text_input("Company *", value=defaults.get("company_name") or "")
         vertical = col2.selectbox(
@@ -239,6 +261,8 @@ def prospect_form(form_key, verticals, submit_label, defaults=None):
             placeholder="Choose or type a new vertical"
         )
 
+        col1, col2 = st.columns(2)
+
         job_title = col1.text_input("Job title", value=defaults.get("job_title") or "")
         status = col2.selectbox(
             "Status",
@@ -246,8 +270,12 @@ def prospect_form(form_key, verticals, submit_label, defaults=None):
             index=status_options.index(defaults.get("status") or status_options[0])
         )
 
+        col1, col2 = st.columns(2)
+
         email = col1.text_input("Email", value=defaults.get("email") or "")
         phone = col2.text_input("Phone", value=defaults.get("phone") or "")
+
+        col1, col2 = st.columns(2)
 
         source = col1.text_input(
             "Source", value=defaults.get("source") or "",
@@ -420,6 +448,7 @@ def add_prospect_dialog():
         ok, message = create_prospect(data)
 
         if ok:
+            reset_form("overview_create_form")
             st.session_state["flash"] = message
             st.rerun()
         else:
@@ -848,6 +877,7 @@ elif page == "Prospects":
             ok, message = create_prospect(data)
 
             if ok:
+                reset_form("create_form")
                 st.session_state["flash"] = message
                 st.rerun()
             else:

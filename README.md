@@ -6,7 +6,7 @@ REVORA est un espace de travail de prospection pour SDR/BDR : il mémorise les
 interactions (appels, emails, notes), organise le portefeuille de prospects et
 aide à décider quelle action effectuer ensuite.
 
-Statut : **prototype local** (Streamlit + SQLite), version 0.13.0.
+Statut : **prototype local** (Streamlit + SQLite), version 0.13.1.
 
 ## Lancer l'application
 

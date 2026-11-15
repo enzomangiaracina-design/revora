@@ -1,5 +1,26 @@
 # CHANGELOG — REVORA
 
+## [0.13.1] — 2026-11-15 — Correctifs du formulaire prospect
+
+### Corrigé
+- **Ordre de la touche Tab** : les champs étaient posés dans une seule paire de colonnes, Tab
+  parcourait donc toute la colonne de gauche (Prénom → Entreprise → Poste…). Une paire de colonnes
+  par ligne : Tab suit maintenant l'ordre de lecture (Prénom → Nom → Entreprise → Verticale…).
+- **Saisie perdue en cas d'erreur** : le formulaire de création se vidait même quand la validation
+  échouait. Il garde désormais la saisie, et n'est vidé qu'après une création réussie
+  (`reset_form` : nouveau numéro de version du formulaire).
+- Concerne les trois usages du formulaire : Prospects › New prospect, Prospects › modification,
+  fenêtre « Add prospect » de l'Overview.
+
+### Tests effectués
+- `python3 -m pytest` : 209 tests réussis ; `revora.db` inchangée.
+- Sur une copie : erreur de validation → saisie conservée ; création → formulaire vidé ;
+  modification toujours pré-remplie et enregistrée ; ordre de Tab vérifié dans le navigateur.
+- Sauvegarde préalable : `backups/20261115-080000/`.
+
+### Remarque
+- Le formulaire d'interaction (`interaction_form`) se vide aussi en cas d'erreur : non modifié ici.
+
 ## [0.13.0] — 2026-11-15 — Overview : cockpit du SDR
 
 Refonte de la page Overview selon la direction « minimaliste fonctionnelle » : elle répond à
