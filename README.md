@@ -37,6 +37,15 @@ python3 database.py
 python3 -m pip install -r requirements.txt
 ```
 
+### Activer l'AI Copilot (facultatif)
+
+1. Créez une clé API sur console.anthropic.com et fixez une **limite de dépense**.
+2. Ajoutez-la dans `.env` (jamais dans le code) : `ANTHROPIC_API_KEY=...`
+3. Relancez l'application, puis Settings › AI features › **Enable AI features**.
+
+Coût indicatif : quelques centimes par génération (affiché sous chaque résultat).
+N'utilisez que des données de démonstration ou de test, sauf autorisation.
+
 ## Lancer les tests
 
 ```bash
@@ -107,7 +116,7 @@ git clone https://github.com/enzomangiaracina-design/revora.git
 | Settings | Fonctionnel : configuration du scoring, calibration, état des intégrations (non connectées) |
 | Objections | Fonctionnel : saisie, statistiques, playbook de réponses, exemples anonymisés, journal |
 | Performance | Fonctionnel : indicateurs d'activité et de résultats, comparaison de périodes, par verticale |
-| AI Copilot | Page vide (à venir) |
+| AI Copilot | Phase 10.1 : dans la fiche prospect, préparation d'appel (faits sourcés / hypothèses) et brouillon d'email, sur clic, désactivé par défaut. Chat global : phase 10.2 |
 
 ## Base de données
 

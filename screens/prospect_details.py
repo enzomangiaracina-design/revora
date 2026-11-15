@@ -14,7 +14,7 @@ from screens.common import *  # noqa: F401,F403
 from screens.shared import *  # noqa: F401,F403
 
 from core.timeline_service import KINDS as TIMELINE_KINDS, build_timeline, filter_timeline
-from database import get_interaction, get_stage_changes
+from database import add_interaction, get_interaction, get_stage_changes
 
 TIMELINE_ICONS = {
     "Call": ":material/call:", "Email": ":material/mail:", "LinkedIn": ":material/work:",
@@ -156,6 +156,111 @@ def _change_stage(contact_id, widget_key, current_stage):
     if not request_stage_change(contact_id, st.session_state[widget_key]):
         # En attente de confirmation (ou refus) : le sélecteur reste sur l'étape actuelle
         st.session_state[widget_key] = current_stage
+
+
+# ==========================================
+# AI COPILOT (phase 10.1)
+# ==========================================
+
+AI_TASKS = {
+    "call_brief": ("Prepare my call", ":material/support_agent:"),
+    "email_draft": ("Draft a follow-up email", ":material/edit_note:"),
+}
+
+
+def _run_ai(task, contact_id, context):
+    """Callback : génère le brief ou le brouillon (un clic = un appel à l'API)."""
+
+    try:
+        data, usage = ai_generate(AI_SYSTEM_PROMPT, ai_build_prompt(task, context), AI_SCHEMAS[task])
+    except CopilotError as error:
+        st.session_state[f"ai_{task}_{contact_id}"] = {"error": str(error)}
+        return
+
+    st.session_state[f"ai_{task}_{contact_id}"] = {
+        "result": ai_validate_output(task, data, context), "usage": usage,
+    }
+
+
+def _save_draft_as_note(contact_id, draft):
+    add_interaction(contact_id, "Note", "Internal", "Other", f"Email draft: {draft['subject']}",
+                    draft["body"], "")
+    st.session_state["flash"] = "Email draft saved as a note in the timeline."
+
+
+def _show_sourced(items, context):
+    for item in items:
+        st.markdown(f"- {item['text']}")
+        if item["sources"]:
+            st.caption("Source: " + " · ".join(ai_source_labels(item["sources"], context)))
+
+
+def ai_copilot_panel(prospect, interactions, objections):
+    """Panneau AI Copilot de la fiche : désactivé tant que non configuré."""
+
+    contact_id = prospect["id"]
+
+    with st.expander("AI Copilot", icon=":material/auto_awesome:"):
+
+        if not (get_setting(AI_SETTING, False) and ai_is_configured()):
+            st.caption(
+                "Off. To use it, add an API key to the .env file, then turn on "
+                "« Enable AI features » in Settings."
+            )
+            st.button("Open Settings", type="tertiary", icon=":material/settings:",
+                      key=f"ai_open_settings_{contact_id}", on_click=go_to, args=("Settings",))
+            return
+
+        context = ai_build_context(prospect, interactions, objections, get_objection_responses())
+        st.caption(f"Sends this prospect's last {len(context['interactions'])} interaction(s) and "
+                   f"{len(context['objections'])} objection(s) to Claude. No email, phone or LinkedIn URL.")
+
+        with st.container(horizontal=True):
+            for task, (label, icon) in AI_TASKS.items():
+                st.button(label, icon=icon, key=f"ai_{task}_btn_{contact_id}",
+                          on_click=_run_ai, args=(task, contact_id, context))
+
+        for task, (label, _) in AI_TASKS.items():
+            outcome = st.session_state.get(f"ai_{task}_{contact_id}")
+
+            if not outcome:
+                continue
+
+            st.markdown(f"**{label}**")
+
+            if "error" in outcome:
+                st.error(outcome["error"])
+                continue
+
+            result = outcome["result"]
+
+            if task == "call_brief":
+                st.markdown("*Facts (from your records)*")
+                _show_sourced(result["facts"], context)
+                if result["hypotheses"]:
+                    st.markdown("*Hypotheses — to verify on the call*")
+                    _show_sourced(result["hypotheses"], context)
+                if result["questions"]:
+                    st.markdown("*Questions to ask*")
+                    st.markdown("\n".join(f"- {q}" for q in result["questions"]))
+                if result["next_step"]:
+                    st.markdown(f"*Next step to propose:* {result['next_step']}")
+            else:
+                st.caption("Draft only — review it before sending from your mailbox. REVORA never sends it.")
+                st.code(f"Subject: {result['subject']}\n\n{result['body']}", language=None, wrap_lines=True)
+                if result["facts_used"]:
+                    st.caption("Based on:")
+                    _show_sourced(result["facts_used"], context)
+                st.button("Save draft as a note", key=f"ai_save_draft_{contact_id}",
+                          on_click=_save_draft_as_note, args=(contact_id, result))
+
+            if result["dropped"]:
+                st.caption(f":orange[{result['dropped']} item(s) removed: they cited no real record.]")
+
+            cost = ai_estimate_cost(outcome["usage"])
+            st.caption(f"Generated by {outcome['usage']['model']} · "
+                       f"{outcome['usage']['input_tokens']} tokens in, {outcome['usage']['output_tokens']} out"
+                       + (f" · ≈ ${cost}" if cost is not None else ""))
 
 
 # ==========================================
@@ -334,6 +439,8 @@ def render(ctx):
     with col_side:
 
         theme.section_title("Context")
+
+        ai_copilot_panel(prospect, interactions, prospect_objections)
 
         with st.expander("Contact", expanded=True, icon=":material/contact_page:"):
             st.markdown(

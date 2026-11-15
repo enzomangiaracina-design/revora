@@ -84,7 +84,7 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 ## P1 — Cockpit SDR (blueprint) ✅
 - ✅ Today's Focus : type d'action, échéance, raison avec source et date (v0.18.0)
 - ✅ Actions rapides : ouvrir, terminer, reporter, « Not now » (mise à l'écart datée)
-- ⬜ Brouillons d'emails / préparation assistée : avec l'IA (P3)
+- ✅ Brouillons d'emails / préparation assistée par l'IA (phase 10.1, v0.25.0)
 
 ## P2 — Finitions (blueprint) ✅
 - ✅ P2.1 Objections : échange d'origine (« Raised during »), catégorie corrigeable dans le journal (v0.19.0)
@@ -105,6 +105,10 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ URL du profil (formulaire, import CSV, fiche, doublons)
 - ✅ Actions LinkedIn (invitation, acceptation, InMail), scoring et performance
 - ⬜ Pas de connecteur : aucune API ouverte ne le permet (à revoir si une intégration Sales Navigator officielle devient disponible)
-## Phase 10 — AI Copilot ⬜
+## Phase 10 — AI Copilot 🟡
+- ✅ 10.1 Fiche prospect : préparation d'appel (faits sourcés, hypothèses, questions) et brouillon d'email,
+  sur clic, désactivé par défaut, sans coordonnées envoyées, sources vérifiées (v0.25.0)
+- ⬜ Premier appel réel avec votre clé (à lancer par vous) : mesurer coût et qualité
+- ⬜ 10.2 Chat sur l'ensemble de la base (plus de données envoyées : à décider)
 ## Phase 11 — Multi-utilisateur ⬜
 ## Phase 12 — Production (PostgreSQL, hébergement, sécurité, monitoring) ⬜

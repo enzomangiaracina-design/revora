@@ -149,3 +149,24 @@ from core.sync_service import run_sync, import_hubspot_contacts
 from integrations.config import get_secret
 from integrations.hubspot.connector import HubSpotConnector
 from integrations.gmail.connector import GmailConnector
+
+# AI Copilot (phase 10.1)
+from ai.claude_client import (
+    MODEL as AI_MODEL,
+    API_KEY_NAME as AI_KEY_NAME,
+    CopilotError,
+    generate as ai_generate,
+    is_configured as ai_is_configured,
+)
+from core.copilot_service import (
+    SETTING_ENABLED as AI_SETTING,
+    SCHEMAS as AI_SCHEMAS,
+    SYSTEM_PROMPT as AI_SYSTEM_PROMPT,
+    build_context as ai_build_context,
+    build_prompt as ai_build_prompt,
+    validate_output as ai_validate_output,
+    source_labels as ai_source_labels,
+    estimate_cost as ai_estimate_cost,
+)
+
+from database import get_setting, set_setting

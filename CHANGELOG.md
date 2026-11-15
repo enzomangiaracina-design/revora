@@ -1,5 +1,32 @@
 # CHANGELOG — REVORA
 
+## [0.25.0] — 2026-11-15 — Phase 10.1 : AI Copilot dans la fiche prospect
+
+### Ajouté
+- Fiche prospect › panneau **AI Copilot** (désactivé par défaut) :
+  - **Prepare my call** : faits (chacun avec sa source : « Call · 10/11 · Discovery »), hypothèses à
+    vérifier, questions à poser, prochaine étape à proposer ;
+  - **Draft a follow-up email** : brouillon à relire et copier — REVORA ne l'envoie jamais ;
+    bouton « Save draft as a note » (enregistrement seulement sur clic).
+  - Consommation et coût estimé affichés sous chaque résultat.
+- Settings › **AI features** : ce qui est envoyé, état de la clé, interrupteur « Enable AI features »
+  (grisé sans clé).
+- `core/copilot_service.py` : contexte envoyé (10 derniers échanges, objections, réponses du
+  playbook concernées, **jamais** email / téléphone / LinkedIn), consignes, schémas de réponse,
+  vérification des sources (un fait sans source réelle est écarté et signalé).
+- `ai/claude_client.py` : appel à Claude Opus 5.5 (`claude-opus-5-5`) avec réponse au format imposé
+  (structured outputs), effort « low », repli automatique en cas de refus (`fallbacks: "default"`),
+  erreurs traduites en messages clairs. Clé lue dans `.env` (`ANTHROPIC_API_KEY`).
+- Dépendance `anthropic>=2.8.0` ; `.env.example` mis à jour.
+
+### Modifié
+- Page AI Copilot : renvoie vers le panneau de la fiche ; le chat global est prévu en 10.2.
+
+### Tests
+- 317 tests (14 nouveaux) avec un **faux client** : aucun appel réel, aucun coût. Vérifié dans le
+  navigateur sur une copie de la base, sans clé : panneau désactivé, interrupteur grisé.
+- **Non vérifié** : un appel réel à l'API (aucune clé configurée). À faire avec votre clé.
+
 ## [0.24.0] — 2026-11-15 — Palette et langue harmonisées
 
 ### Décisions
