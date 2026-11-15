@@ -465,3 +465,148 @@ def validate_chat(data, context):
         "dropped": dropped_facts + dropped_hyp,
         "prospects": cited,
     }
+
+
+# ==========================================
+# PHASE 8 : DÉTECTION DES OBJECTIONS DANS LES NOTES
+# ==========================================
+# L'IA SUGGÈRE seulement : rien n'est enregistré sans la confirmation du
+# commercial (bouton « Add »). Garde-fou principal : la formulation proposée
+# doit se retrouver MOT POUR MOT dans les notes de l'échange cité, sinon la
+# suggestion est écartée (impossible d'inventer une objection).
+
+OBJECTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "objections": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "interaction": {"type": "string"},
+                    "category": {"type": "string"},
+                    "wording": {"type": "string"},
+                    "why": {"type": "string"},
+                },
+                "required": ["interaction", "category", "wording", "why"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["objections"],
+    "additionalProperties": False,
+}
+
+OBJECTION_SYSTEM_PROMPT = """You help an SDR spot sales objections in their own interaction notes.
+
+An objection is a reason the PROSPECT gave for not moving forward (budget, timing, already equipped,
+not the decision maker, price, competitor, no need…). The SDR's own actions, plans and questions are
+not objections. Only report objections that are actually expressed in the notes: never infer one
+that is not written.
+
+For each objection:
+- interaction: the id of the interaction it appears in (like "I12").
+- category: one of the given categories if one fits; otherwise a short new category in English.
+- wording: an EXACT quote copied character for character from that interaction's subject or notes
+  (keep the original language, typically French). Do not translate, rephrase or shorten words.
+- why: one short sentence in English explaining why this is an objection.
+Skip objections already recorded for the same interaction with the same category.
+If there is no objection, return an empty list."""
+
+
+def _normalize(text):
+    """Texte comparable : minuscules, apostrophes et guillemets unifiés, espaces réduits."""
+
+    text = (text or "").casefold()
+    for fancy, plain in (("’", "'"), ("‘", "'"), ("“", '"'), ("”", '"'), ("«", '"'), ("»", '"')):
+        text = text.replace(fancy, plain)
+
+    return " ".join(text.split())
+
+
+def build_objection_context(interactions, objections, categories, limit=MAX_INTERACTIONS):
+    """Échanges à analyser (ceux qui ont des notes), objections déjà saisies et catégories.
+
+    interactions : get_interactions (les plus récentes d'abord) ; seules les
+    `limit` dernières avec un sujet ou des notes sont envoyées.
+    Retourne {"interactions", "recorded", "categories", "labels", "texts"} ;
+    texts garde le texte de chaque échange pour vérifier les citations.
+    """
+
+    sent, labels, texts = [], {}, {}
+
+    for item in interactions:
+        if len(sent) >= limit:
+            break
+
+        if not (item.get("content") or "").strip() and not (item.get("subject") or "").strip():
+            continue
+
+        source_id = f"I{item['id']}"
+        day = item["occurred_at_local"][:10]
+        sent.append({
+            "id": source_id,
+            "date": item["occurred_at_local"][:16],
+            "channel": item["channel"],
+            "direction": item["direction"],
+            "subject": item.get("subject") or None,
+            "notes": item.get("content") or None,
+        })
+        labels[source_id] = f"{item['channel']} · {day[8:10]}/{day[5:7]}" + (
+            f" · {item['subject']}" if item.get("subject") else "")
+        texts[source_id] = f"{item.get('subject') or ''}\n{item.get('content') or ''}"
+
+    recorded = [
+        {"interaction": f"I{o['interaction_id']}", "category": o["category"]}
+        for o in objections if o.get("interaction_id") and f"I{o['interaction_id']}" in labels
+    ]
+
+    return {"interactions": sent, "recorded": recorded, "categories": list(categories),
+            "labels": labels, "texts": texts}
+
+
+def build_objection_prompt(context):
+    """Message envoyé à l'IA : les catégories, les objections déjà saisies et les échanges."""
+
+    record = {key: context[key] for key in ("categories", "recorded", "interactions")}
+
+    return ("Find the objections expressed by the prospect in these interactions.\n\n"
+            f"Data (JSON):\n{json.dumps(record, ensure_ascii=False, indent=1)}")
+
+
+def validate_objections(data, context):
+    """Garde les suggestions vérifiables. Retourne {"suggestions", "dropped"}.
+
+    Une suggestion est écartée si : l'échange cité n'a pas été envoyé, la
+    formulation ne figure pas mot pour mot dans ses notes, la catégorie est
+    vide, ou elle est déjà enregistrée (même échange, même catégorie).
+    """
+
+    known = {c.casefold(): c for c in context["categories"]}
+    taken = {(r["interaction"], r["category"].casefold()) for r in context["recorded"]}
+    suggestions, dropped = [], 0
+
+    for item in data.get("objections") or []:
+        source = (item.get("interaction") or "").strip()
+        wording = (item.get("wording") or "").strip().strip('"«» ')
+        category = (item.get("category") or "").strip()
+        category = known.get(category.casefold(), category)       # « no budget » -> « No budget »
+
+        quoted = wording and _normalize(wording) in _normalize(context["texts"].get(source, ""))
+        key = (source, category.casefold())
+
+        if source not in context["labels"] or not quoted or not category or key in taken:
+            dropped += 1
+            continue
+
+        taken.add(key)                                              # pas deux fois la même
+        suggestions.append({
+            "source": source,
+            "interaction_id": int(source[1:]),
+            "label": context["labels"][source],
+            "category": category,
+            "wording": wording,
+            "why": (item.get("why") or "").strip(),
+        })
+
+    return {"suggestions": suggestions, "dropped": dropped}

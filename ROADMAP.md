@@ -69,12 +69,13 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 ## Phase 7 — Noota ⏸ (en pause)
 Vérification des API réellement disponibles, appels, transcriptions, rapprochement contacts, analyse IA.
 
-## Phase 8 — Objection Intelligence 🟡
+## Phase 8 — Objection Intelligence ✅
 - ✅ Saisie manuelle (interaction, fiche prospect), catégories personnalisables, statuts
 - ✅ Statistiques : fréquence, évolution, par verticale, entreprise et étape du pipeline
 - ✅ Playbook de réponses recommandées, exemples anonymisés
 - ✅ Préparation d'appel dans la fiche prospect
-- ⬜ Détection et catégorisation automatiques par IA (après Noota / AI Copilot), toujours à confirmer
+- ✅ Détection et catégorisation par IA dans les notes, citations vérifiées, toujours à confirmer (v0.30.0)
+- ⬜ Plus tard : détection dans les transcriptions d'appels (après Noota, phase 7)
 ## P0 — Fondations UX (blueprint Produit & UX) ✅
 - ✅ P0.1 Découpage de l'interface : une page = un module (`screens/`), sans changement de comportement
 - ✅ P0.2 Navigation : ordre du blueprint, fiche prospect ouverte depuis les listes (v0.15.0)

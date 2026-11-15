@@ -10,6 +10,7 @@ Chaque événement : {"at", "kind", "title", "detail", "meta", "source"}.
 KINDS = ["Interaction", "Follow-up", "Objection", "Stage", "Score", "Prospect"]
 
 from core.activity_service import SOURCE_LABELS  # une seule définition des sources
+from core.objection_service import SOURCE_LABELS as OBJECTION_SOURCES
 
 
 def _interaction_event(item, format_duration):
@@ -62,7 +63,7 @@ def build_timeline(prospect, interactions, tasks, objections, score_history, sta
             "meta": f"Status: {objection['status']} · stage: {objection.get('stage') or '—'}"
                     + (f" · during {objection['interaction_channel'] or 'interaction'}"
                        if objection.get("interaction_at_local") else ""),
-            "source": SOURCE_LABELS.get(objection.get("source"), objection.get("source") or "Manual"),
+            "source": OBJECTION_SOURCES.get(objection.get("source"), objection.get("source") or "Manual"),
         })
 
     origin = {"pipeline": "moved in the pipeline", "edit": "changed in the prospect form",

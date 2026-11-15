@@ -106,6 +106,7 @@ from database import (
 )
 from core.objection_service import (
     STATUSES as OBJECTION_STATUSES,
+    SOURCE_LABELS as OBJECTION_SOURCE_LABELS,
     PLAYBOOK_PLACEHOLDER,
     categories as objection_categories,
     record_objection,
@@ -173,6 +174,11 @@ from core.copilot_service import (
     EMAIL_LANGUAGES as AI_EMAIL_LANGUAGES,
     EMAIL_TONES as AI_EMAIL_TONES,
     email_style as ai_email_style,
+    OBJECTION_SCHEMA as AI_OBJECTION_SCHEMA,
+    OBJECTION_SYSTEM_PROMPT as AI_OBJECTION_SYSTEM_PROMPT,
+    build_objection_context as ai_build_objection_context,
+    build_objection_prompt as ai_build_objection_prompt,
+    validate_objections as ai_validate_objections,
 )
 
 from database import get_setting, set_setting

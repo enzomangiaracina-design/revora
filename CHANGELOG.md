@@ -1,5 +1,28 @@
 # CHANGELOG — REVORA
 
+## [0.30.0] — 2026-11-15 — Détection des objections par IA
+
+### Ajouté
+- Fiche prospect › AI Copilot : bouton **« Find objections in notes »**. L'IA lit les notes des
+  10 derniers échanges (sujet et notes uniquement, aucune coordonnée) et **suggère** les objections
+  exprimées par le prospect, avec la citation, l'échange d'origine, une catégorie et une explication.
+  - Rien n'est enregistré sans clic sur **Add** ; la catégorie peut être corrigée avant ; **Dismiss**
+    écarte la suggestion.
+  - Garde-fou : une suggestion est écartée si sa citation ne figure pas **mot pour mot** dans les
+    notes de l'échange cité, si l'échange n'existe pas, ou si l'objection est déjà enregistrée.
+  - L'objection ajoutée est reliée à l'échange, prend sa date et porte la source `ai`, affichée
+    « AI (confirmed) » dans le fil de la fiche et le journal des objections.
+- `record_objection(..., source=)` (par défaut `manual`) ; `core/copilot_service.py` :
+  `OBJECTION_SCHEMA`, `build_objection_context`, `build_objection_prompt`, `validate_objections`.
+
+### Corrigé
+- Le panneau AI Copilot de la fiche restait parfois replié après un clic (clé stable + état mémorisé).
+
+### Tests
+- 358 tests (8 nouveaux dans `tests/test_objection_detection.py`). Vérifié en réel avec Gemini sur une
+  copie de la démo : 4 objections justes trouvées dans 2 échanges, aucune inventée, une déjà saisie
+  correctement écartée. `revora.db` inchangée.
+
 ## [0.29.0] — 2026-11-15 — Base de démonstration fictive
 
 ### Ajouté

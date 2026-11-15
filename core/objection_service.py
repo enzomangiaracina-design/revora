@@ -31,6 +31,9 @@ DEFAULT_CATEGORIES = [
 
 STATUSES = ["Open", "Handled", "Lost"]
 
+# Origine d'une objection : saisie à la main, ou suggérée par l'IA puis confirmée
+SOURCE_LABELS = {"manual": "Manual", "ai": "AI (confirmed)"}
+
 PLAYBOOK_PLACEHOLDER = (
     "1. Acknowledge: show you heard the concern.\n"
     "2. Clarify: ask one question to understand the real reason.\n"
@@ -55,7 +58,8 @@ def categories(objections=None):
     return DEFAULT_CATEGORIES + used
 
 
-def record_objection(contact_id, category, verbatim=None, *, interaction_id=None, occurred_at=None):
+def record_objection(contact_id, category, verbatim=None, *, interaction_id=None, occurred_at=None,
+                     source="manual"):
     """Valide puis enregistre une objection. Retourne (succès, message).
 
     Concept : l'étoile (*) rend interaction_id et occurred_at "nommés
@@ -73,12 +77,12 @@ def record_objection(contact_id, category, verbatim=None, *, interaction_id=None
     # P2 : l'échange d'origine doit appartenir au même prospect ; l'objection
     # prend alors la date de cet échange (sinon : maintenant).
     if interaction_id is not None:
-        source = next((i for i in database.get_interactions(contact_id) if i["id"] == interaction_id), None)
+        origin = next((i for i in database.get_interactions(contact_id) if i["id"] == interaction_id), None)
 
-        if not source:
+        if not origin:
             return False, "This interaction does not belong to this prospect."
 
-        when = when or source["occurred_at_local"]
+        when = when or origin["occurred_at_local"]
 
     database.add_objection(
         contact_id,
@@ -86,6 +90,7 @@ def record_objection(contact_id, category, verbatim=None, *, interaction_id=None
         verbatim=verbatim,
         interaction_id=interaction_id,
         occurred_at=when,
+        source=source,
     )
 
     return True, f"Objection saved: {category}."

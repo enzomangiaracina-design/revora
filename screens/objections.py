@@ -197,7 +197,7 @@ def render(ctx):
                     "Wording": o["verbatim"],
                     "Raised during": source_interaction(o) or "—",
                     "Status": o["status"],
-                    "Source": o["source"],
+                    "Source": OBJECTION_SOURCE_LABELS.get(o["source"], o["source"]),
                 }
                 for o in objections
             ])
