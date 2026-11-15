@@ -139,6 +139,33 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"][data-selecte
     color: {COLORS["lavender"]};
 }}
 
+/* Petits écrans : cartes KPI en grille de 2 colonnes au lieu d'une pile.
+   Cible uniquement les colonnes qui contiennent DIRECTEMENT une carte KPI. */
+@media (max-width: 640px) {{
+    div[data-testid="stColumn"]:has(
+        > div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] > div[data-testid="stMetric"]
+    ) {{
+        /* 50 % moins la moitié de l'espacement de 16 px entre colonnes */
+        width: calc(50% - {SPACE * 2}px) !important;
+        flex: 0 0 calc(50% - {SPACE * 2}px) !important;
+        min-width: calc(50% - {SPACE * 2}px) !important;
+    }}
+
+    div[data-testid="stMetric"] {{
+        padding: {SPACE * 3}px {SPACE * 3}px;
+    }}
+}}
+
+/* Titres de section compacts (Overview) */
+.revora-section {{
+    color: #9CA3AF;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: {SPACE * 2}px 0 {SPACE * 2}px 0;
+}}
+
 /* Descripteur sous le logo */
 .revora-descriptor {{
     color: {COLORS["gray"]};
@@ -155,6 +182,12 @@ h1 {{
 }}
 </style>
 """
+
+
+def section_title(text, container=None):
+    """Titre de section discret (majuscules espacées), via le style centralisé."""
+
+    (container or st).markdown(f'<div class="revora-section">{text}</div>', unsafe_allow_html=True)
 
 
 def apply_theme():

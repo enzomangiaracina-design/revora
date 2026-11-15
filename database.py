@@ -1026,6 +1026,44 @@ def get_score_history(contact_id):
     return [_score_row(row) for row in rows]
 
 
+def get_recent_score_changes(limit=20, min_change=5):
+    """Dernieres variations notables du score global, tous prospects confondus.
+
+    Concept : LAG() est une "fonction de fenetre" SQL. Pour chaque ligne,
+    elle lit la valeur de la ligne precedente du meme prospect : on obtient
+    ainsi l'ancien et le nouveau score sur une seule ligne.
+
+    min_change : ecart minimal (en points) pour ignorer les petites
+    variations dues au vieillissement des signaux.
+    """
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT * FROM (
+            SELECT
+                scores.contact_id,
+                datetime(scores.calculated_at, 'localtime') AS occurred_at_local,
+                scores.global_score,
+                LAG(scores.global_score) OVER (
+                    PARTITION BY scores.contact_id ORDER BY scores.id
+                ) AS previous_score
+            FROM scores
+        )
+        WHERE previous_score IS NOT NULL
+          AND abs(global_score - previous_score) >= ?
+        ORDER BY occurred_at_local DESC
+        LIMIT ?
+        """,
+        (min_change, limit)
+    ).fetchall()
+
+    connection.close()
+
+    return [dict(row) for row in rows]
+
+
 def save_score(contact_id, fit, engagement, intent, global_score, explanation):
     """Ajoute un point a l'historique SEULEMENT si un score a change.
 

@@ -1,5 +1,53 @@
 # CHANGELOG — REVORA
 
+## [0.13.0] — 2026-11-15 — Overview : cockpit du SDR
+
+Refonte de la page Overview selon la direction « minimaliste fonctionnelle » : elle répond à
+« Où en suis-je ? », « Quels prospects demandent mon attention ? », « Que faire ensuite ? ».
+Aucune donnée inventée : chaque section réutilise des requêtes existantes.
+
+### Ajouté
+- **En-tête** : salutation selon l'heure, date du jour, recherche de prospects (`filter_prospects`),
+  bouton **Add prospect** (fenêtre réutilisant le formulaire et les contrôles existants).
+- **4 KPI** : appels du jour et emails envoyés du jour (écart avec la veille), relances dues
+  (dont en retard, en rouge), prospects prioritaires.
+- **Today's focus** : 8 prospects classés par `prioritize()` — priorité (High / Medium / Low selon les
+  points d'urgence), entreprise, étape, score, dernier contact, **action recommandée déduite de la
+  raison** (relance à faire, premier contact, relance après inactivité ; aucune IA), raison, bouton
+  d'ouverture de la fiche ; lien vers toutes les priorités du pipeline.
+- **Recent activity** : fil chronologique des interactions, objections, nouveaux prospects et variations
+  de score (≥ 5 points), chaque événement ouvre la fiche du prospect.
+- **Last 7 days** : taux de connexion, taux de réponse, rendez-vous (écart avec les 7 jours précédents)
+  et tendance sur 14 jours ; lien vers la page Performance.
+- États vides utiles : base vide (ajout, import CSV), rien d'urgent (lien pipeline), aucune activité
+  (lien vers la saisie d'activité).
+- `core/overview_service.py` (mise en forme pure), `database.get_recent_score_changes` (lecture, LAG SQL).
+- Thème : titres de section compacts ; sur petit écran, cartes KPI en grille de 2 colonnes.
+- 20 nouveaux tests (209 au total).
+
+### Modifié
+- Les onglets des pages Prospects et Activity peuvent être ouverts depuis une autre page
+  (`on_change="rerun"`), nécessaire pour les liens des états vides.
+- Retirés de l'Overview : le tableau complet des prospects (toujours sur la page Prospects) et les
+  compteurs cumulés ; les anciens compteurs faisaient une requête par prospect.
+
+### Problèmes trouvés et corrigés pendant les vérifications
+- Boutons « Open » tronqués → bouton icône ; libellé « Follow-ups due · x overdue » coupé → écart rouge.
+- Mini-cartes « Last 7 days » tronquées dans la colonne étroite → liste compacte.
+- Grille mobile : l'espacement de 16 px faisait passer la 2e carte à la ligne → largeur corrigée.
+- Le lien « Import a CSV file » ouvrait le mauvais onglet → onglets pilotables (voir ci-dessus).
+
+### Défauts préexistants repérés (non corrigés, hors périmètre)
+- Formulaire prospect : la touche Tab parcourt la colonne de gauche avant celle de droite.
+- Formulaire prospect : les champs se vident quand la validation échoue.
+
+### Tests effectués
+- `python3 -m pytest` : 209 tests réussis ; `revora.db` inchangée. Les 9 pages s'affichent sans erreur.
+- Navigateur sur une copie avec données fictives : KPI, focus et raisons, ouverture de fiche,
+  fenêtre d'ajout (erreur de validation puis création), recherche, fil d'activité, résumé 7 jours,
+  affichage mobile (375 px) ; sur une base vide : états vides et leurs liens.
+- Sauvegarde préalable : `backups/20261115-001608/`. Aucune migration de base.
+
 ## [0.12.0] — 2026-11-15 — Page Performance (module H)
 
 ### Ajouté

@@ -70,6 +70,10 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ Playbook de réponses recommandées, exemples anonymisés
 - ✅ Préparation d'appel dans la fiche prospect
 - ⬜ Détection et catégorisation automatiques par IA (après Noota / AI Copilot), toujours à confirmer
+## Overview — cockpit du SDR ✅
+- ✅ KPI du jour, Today's focus explicable, fil d'activité, résumé 7 jours, états vides, mobile
+- ⬜ Historique des changements d'étape (pour les afficher dans le fil d'activité)
+
 ## Module H — Performance ✅ (avant la phase 9)
 - ✅ Indicateurs individuels, comparaison de périodes, activité quotidienne, par verticale
 - ⬜ Par séquence (avec HubSpot), vues manager / équipe (phase 11)
