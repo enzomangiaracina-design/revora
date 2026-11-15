@@ -131,7 +131,11 @@ def render(ctx):
     )
 
     if not prospects:
-        st.info("Add a prospect before opening a prospect file.")
+        empty_state(
+            "No prospect yet",
+            "Add or import prospects to open their 360° file.",
+            [ADD_PROSPECT, IMPORT_CSV], icon=":material/person:", key="details_empty",
+        )
         return
 
     prospect_options = {prospect_label(p): p["id"] for p in prospects}
@@ -149,7 +153,12 @@ def render(ctx):
     prospect = get_prospect_by_id(contact_id)
 
     if not prospect:
-        st.info("This prospect no longer exists.")
+        empty_state(
+            "This prospect no longer exists",
+            "It may have been deleted. Go back to choose another prospect.",
+            [{"label": f"Back to {origin}", "icon": ":material/arrow_back:", "on_click": close_prospect}],
+            icon=":material/person_off:", key="details_missing",
+        )
         return
 
     show_flash_message()

@@ -34,7 +34,11 @@ def render(ctx):
     with tab_list:
 
         if not prospects:
-            st.info("No prospects registered. Create one or import a CSV file.")
+            empty_state(
+                "No prospect registered yet",
+                "Create a prospect or import a CSV file (French and HubSpot headers are recognized).",
+                [ADD_PROSPECT, IMPORT_CSV], icon=":material/group_add:", key="prospects_empty",
+            )
 
         else:
             col_search, col_vertical, col_status, col_source, col_owner = st.columns(
@@ -107,7 +111,7 @@ def render(ctx):
                 )
                 st.caption("Select a row to open the prospect file.")
             else:
-                st.info("No prospect matches these filters.")
+                no_results("prospect", key="prospects_no_results")
 
             st.divider()
             st.subheader("Edit a prospect")

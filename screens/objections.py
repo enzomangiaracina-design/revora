@@ -58,9 +58,11 @@ def render(ctx):
     with tab_insights:
 
         if not objections:
-            st.info(
-                "No objection recorded for this period. Note objections when recording a call "
-                "or an email, or from a prospect file."
+            empty_state(
+                "No objection recorded for this period",
+                "Note objections when logging a call or an email, or from a prospect file. "
+                "Only objections actually expressed are counted.",
+                [LOG_ACTIVITY], icon=":material/forum:", key="objections_empty",
             )
 
         else:
@@ -150,7 +152,7 @@ def render(ctx):
     with tab_log:
 
         if not objections:
-            st.info("No objection for these filters.")
+            no_results("objection", key="objections_no_results")
 
         else:
             log = pd.DataFrame([

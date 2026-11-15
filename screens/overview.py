@@ -48,9 +48,11 @@ def render(ctx):
                                 args=(p["id"],), width="stretch")
 
     if not prospects:
-        st.info("Your prospect database is empty. Add a first prospect or import a CSV file.")
-        st.button("Import a CSV file", icon=":material/upload_file:",
-                  on_click=go_to, args=("Prospects",), kwargs={"prospects_tabs": "Import CSV"})
+        empty_state(
+            "Your prospect database is empty",
+            "Add a first prospect or import a CSV file: priorities and activity will appear here.",
+            [ADD_PROSPECT, IMPORT_CSV], icon=":material/group_add:", key="overview_empty",
+        )
 
     # ---------- 2. INDICATEURS DU JOUR ----------
 
@@ -100,11 +102,12 @@ def render(ctx):
         rows = focus_rows(ranked, scores, limit=8, today=today)
 
         if not rows:
-            with st.container(border=True):
-                st.markdown("**Nothing urgent today.**")
-                st.caption("No overdue follow-up, no prospect left without contact. "
-                           "Use the pipeline to move prospects forward.")
-                st.button("Open the pipeline", on_click=go_to, args=("Prospecting Pipeline",))
+            empty_state(
+                "Nothing urgent today",
+                "No overdue follow-up, no prospect left without contact. "
+                "Use the pipeline to move prospects forward.",
+                [OPEN_PIPELINE], icon=":material/task_alt:", key="focus_empty",
+            )
 
         for row in rows:
             with st.container(border=True):
@@ -148,12 +151,14 @@ def render(ctx):
             all_interactions, all_objections, prospects, get_recent_score_changes(), limit=8
         )
 
-        with st.container(border=True):
+        if not feed:
+            empty_state(
+                "No activity recorded yet",
+                "Your calls, emails, objections and new prospects will appear here.",
+                [LOG_ACTIVITY], icon=":material/history:", key="feed_empty",
+            )
 
-            if not feed:
-                st.caption("No activity recorded yet.")
-                st.button("Log a first call or email", on_click=go_to,
-                          args=("Activity",), kwargs={"activity_tabs": "Log activity"})
+        with st.container(border=bool(feed)):
 
             for index, event in enumerate(feed):
                 # Une ligne compacte : icone, evenement et heure ; le prospect en lien dessous

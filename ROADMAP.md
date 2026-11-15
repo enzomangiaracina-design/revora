@@ -70,11 +70,11 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ Playbook de réponses recommandées, exemples anonymisés
 - ✅ Préparation d'appel dans la fiche prospect
 - ⬜ Détection et catégorisation automatiques par IA (après Noota / AI Copilot), toujours à confirmer
-## P0 — Fondations UX (blueprint Produit & UX) 🟡
+## P0 — Fondations UX (blueprint Produit & UX) ✅
 - ✅ P0.1 Découpage de l'interface : une page = un module (`screens/`), sans changement de comportement
 - ✅ P0.2 Navigation : ordre du blueprint, fiche prospect ouverte depuis les listes (v0.15.0)
 - ✅ P0.3 Fiche prospect 360° : en-tête, timeline unifiée, historique des changements d'étape (v0.16.0)
-- ⬜ P0.4 États vides / erreur communs à toutes les pages
+- ✅ P0.4 États vides / erreur communs à toutes les pages (v0.17.0)
 
 ## Overview — cockpit du SDR ✅
 - ✅ KPI du jour, Today's focus explicable, fil d'activité, résumé 7 jours, états vides, mobile

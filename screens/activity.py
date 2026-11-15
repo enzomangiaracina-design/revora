@@ -78,8 +78,14 @@ def render(ctx):
                 width="stretch",
                 hide_index=True
             )
+        elif not get_all_interactions():
+            empty_state(
+                "No activity recorded yet",
+                "Log your calls, emails, LinkedIn messages and notes to build each prospect's history.",
+                [LOG_ACTIVITY], icon=":material/history:", key="activity_empty",
+            )
         else:
-            st.info("No interaction for these filters.")
+            no_results("interaction", key="activity_no_results")
 
     # ---------- RELANCES ----------
 
@@ -93,7 +99,11 @@ def render(ctx):
         ]
 
         if not any(task_groups[key] for key, _ in sections):
-            st.info("No open follow-ups. Schedule one from a prospect file or when logging an activity.")
+            empty_state(
+                "No open follow-ups",
+                "Schedule one from a prospect file, or set a follow-up date when logging an activity.",
+                [LOG_ACTIVITY], icon=":material/event_available:", key="followups_empty",
+            )
 
         for key, label in sections:
             if task_groups[key]:
@@ -115,7 +125,11 @@ def render(ctx):
     with tab_log:
 
         if not prospects:
-            st.info("Add a prospect before logging an activity.")
+            empty_state(
+                "No prospect yet",
+                "Activities are always linked to a prospect. Add or import prospects first.",
+                [ADD_PROSPECT, IMPORT_CSV], icon=":material/group:", key="log_empty",
+            )
 
         else:
             options = {

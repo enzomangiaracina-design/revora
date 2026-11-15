@@ -361,3 +361,99 @@ def follow_up_card(task, show_prospect=True):
                 complete_task(task["id"])
                 st.session_state["flash"] = f"Follow-up completed: {task['title']}"
                 st.rerun()
+
+
+# ==========================================
+# ETATS VIDES ET ERREURS (P0.4)
+# ==========================================
+# Un seul modele pour toute l'application (blueprint : « les etats vides
+# expliquent quoi faire ensuite », « les erreurs sont visibles et recuperables »).
+
+def empty_state(title, message="", actions=(), icon=":material/inbox:", key="empty"):
+    """Etat vide : icone + titre + explication + actions pour continuer.
+
+    actions : liste de dictionnaires {"label", "on_click", "args", "kwargs",
+              "icon", "primary"} ; chaque bouton execute son callback.
+    key     : prefixe unique (plusieurs etats vides peuvent coexister sur une page).
+    """
+
+    with st.container(border=True):
+        st.markdown(f"{icon} **{title}**")
+
+        if message:
+            st.caption(message)
+
+        if actions:
+            # Rangée horizontale : chaque bouton prend la largeur de son texte et
+            # passe à la ligne s'il manque de place (colonnes étroites, mobile).
+            with st.container(horizontal=True, wrap=True):
+                for index, action in enumerate(actions):
+                    st.button(
+                        action["label"],
+                        key=f"{key}_action_{index}",
+                        icon=action.get("icon"),
+                        type="primary" if action.get("primary") else "secondary",
+                        on_click=action.get("on_click"),
+                        args=action.get("args", ()),
+                        kwargs=action.get("kwargs", {}),
+                        width="content",
+                    )
+
+
+def no_results(what, key="no_results"):
+    """Etat vide d'une liste filtree : rien ne correspond aux filtres choisis."""
+
+    empty_state(
+        f"No {what} matches these filters",
+        "Loosen or clear the filters above to see more.",
+        icon=":material/filter_alt_off:",
+        key=key,
+    )
+
+
+# Actions reutilisables des etats vides
+ADD_PROSPECT = {
+    "label": "Add a prospect", "icon": ":material/person_add:", "primary": True,
+    "on_click": go_to, "args": ("Prospects",), "kwargs": {"prospects_tabs": "New prospect"},
+}
+IMPORT_CSV = {
+    "label": "Import a CSV file", "icon": ":material/upload_file:",
+    "on_click": go_to, "args": ("Prospects",), "kwargs": {"prospects_tabs": "Import CSV"},
+}
+LOG_ACTIVITY = {
+    "label": "Log a call or email", "icon": ":material/add_call:", "primary": True,
+    "on_click": go_to, "args": ("Activity",), "kwargs": {"activity_tabs": "Log activity"},
+}
+OPEN_PIPELINE = {
+    "label": "Open the pipeline", "icon": ":material/view_kanban:",
+    "on_click": go_to, "args": ("Prospecting Pipeline",),
+}
+
+
+def error_state(error):
+    """Erreur inattendue d'une page : message clair, actions, details techniques.
+
+    Les donnees ne sont pas touchees : les ecritures en base se font dans des
+    transactions qui sont annulees en cas d'erreur.
+    """
+
+    import traceback
+
+    details = "".join(traceback.format_exception(error))
+    print(details)  # aussi visible dans le terminal qui a lance streamlit
+
+    with st.container(border=True):
+        st.markdown(":material/error: **This page hit an unexpected error.**")
+        st.caption(
+            "Your data is safe. Try again; if the error persists, go back to the Overview "
+            "and share the technical details below."
+        )
+
+        col_retry, col_home, _ = st.columns([1, 1, 2])
+        col_retry.button("Try again", icon=":material/refresh:", type="primary",
+                         key="error_retry", width="stretch")
+        col_home.button("Back to Overview", icon=":material/home:", key="error_home",
+                        on_click=go_to, args=("Overview",), width="stretch")
+
+        with st.expander("Technical details"):
+            st.code(details, language="text")

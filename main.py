@@ -13,7 +13,7 @@ import streamlit as st
 from core.score_service import refresh_scores
 from database import get_all_prospects, get_stage_names, initialize_database
 from screens import AppContext
-from screens.shared import close_prospect
+from screens.shared import close_prospect, error_state
 from screens import overview, prospects, prospect_details, pipeline, activity, objections, copilot, performance, settings
 from ui import theme
 
@@ -79,7 +79,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.16.0")
+st.sidebar.caption("VERSION 0.17.0")
 
 # ==========================================
 # 4. PAGE CHOISIE
@@ -96,7 +96,14 @@ PAGES = {
     "Settings": settings.render,
 }
 
-if st.session_state.get("prospect_open"):
-    prospect_details.render(ctx)
-else:
-    PAGES[page](ctx)
+# Une erreur inattendue dans une page ne doit pas afficher une trace brute :
+# message clair, actions pour continuer, details techniques repliés.
+# (Les mecanismes internes de Streamlit, comme st.rerun, ne sont pas des
+# "Exception" mais des "BaseException" : ils ne sont donc pas interceptes ici.)
+try:
+    if st.session_state.get("prospect_open"):
+        prospect_details.render(ctx)
+    else:
+        PAGES[page](ctx)
+except Exception as error:
+    error_state(error)

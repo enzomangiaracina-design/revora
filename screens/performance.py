@@ -87,7 +87,11 @@ def render(ctx):
     if any(row["Calls"] or row["Emails sent"] or row["Replies"] for row in activity_rows):
         st.bar_chart(pd.DataFrame(activity_rows).set_index("Day"), stack=False)
     else:
-        st.info("No interaction recorded in this period.")
+        empty_state(
+            "No interaction recorded in this period",
+            "Indicators are calculated only from recorded activity. Choose a longer period or log activity.",
+            [LOG_ACTIVITY], icon=":material/bar_chart:", key="performance_daily_empty",
+        )
 
     st.markdown("**By vertical**")
     vertical_rows = by_vertical(all_interactions, all_objections, prospects, start, end)
@@ -95,7 +99,11 @@ def render(ctx):
     if vertical_rows:
         st.dataframe(pd.DataFrame(vertical_rows), width="stretch", hide_index=True)
     else:
-        st.info("No prospect contacted in this period.")
+        empty_state(
+            "No prospect contacted in this period",
+            "The table by vertical fills in as soon as prospects are contacted.",
+            icon=":material/table_chart:", key="performance_vertical_empty",
+        )
 
     with st.expander("How are these indicators calculated?"):
         st.markdown(

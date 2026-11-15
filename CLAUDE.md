@@ -29,6 +29,7 @@
 - `main.py` : configuration, données communes (`AppContext`), navigation et aiguillage — rien d'autre.
 - `screens/` : une page = un module avec `render(ctx)` ; outils d'interface communs dans `screens/shared.py`,
   imports communs dans `screens/common.py`. Modifier une page = modifier son module, sans toucher aux autres.
+- États vides : toujours `empty_state` / `no_results` (`screens/shared.py`) avec une action pour continuer ; ne pas réintroduire de `st.info` ad hoc.
 - Ne pas créer de dossier `pages/` : Streamlit le transforme automatiquement en navigation multipage.
 - `DATABASE_PATH` est relatif à `database.py` (pas au dossier courant).
 - Interactions : `UNIQUE(provider, external_id)` garantit l'idempotence des synchronisations futures ; les saisies manuelles utilisent `provider = 'manual'`.

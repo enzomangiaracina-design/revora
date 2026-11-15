@@ -1,5 +1,29 @@
 # CHANGELOG — REVORA
 
+## [0.17.0] — 2026-11-15 — P0.4 : états vides et erreurs communs
+
+### Ajouté
+- **`empty_state`** (`screens/shared.py`) : un seul modèle d'état vide pour toute l'application — icône,
+  titre, explication et **actions pour continuer** (ajouter un prospect, importer un CSV, saisir une activité,
+  ouvrir le pipeline). Les boutons prennent la largeur de leur texte et passent à la ligne si besoin.
+- **`no_results`** : état des listes filtrées sans résultat (« No … matches these filters »).
+- **`error_state`** + garde dans `main.py` : une erreur inattendue dans une page affiche un message clair
+  (« Your data is safe »), les actions *Try again* / *Back to Overview* et les détails techniques repliés,
+  au lieu d'une trace Python brute. Le menu reste utilisable. Les mécanismes internes de Streamlit
+  (`st.rerun`…) ne sont pas interceptés (ce sont des `BaseException`).
+- 17 états vides harmonisés sur Overview, Prospects, Pipeline (dont tableau vide), Activity, Objections,
+  AI Copilot, Performance et la fiche prospect.
+- `tests/test_ui_states.py` : 18 tests d'interface (toutes les pages sur base vide, états vides et leurs
+  actions, erreur interceptée, `st.rerun` non intercepté). 254 tests au total.
+
+### Tests effectués
+- `python3 -m pytest` : 254 tests réussis ; `revora.db` inchangée (les tests d'interface utilisent une base
+  temporaire).
+- Navigateur sur une base vide : états vides de l'Overview ; boutons tronqués dans les colonnes étroites
+  → rangée horizontale à largeur naturelle ; écran d'erreur vérifié en provoquant volontairement une
+  erreur dans une copie de test.
+- Sauvegarde préalable : `backups/20261115-083336/`. Aucune migration de base.
+
 ## [0.16.0] — 2026-11-15 — P0.3 : fiche prospect 360°
 
 ### Ajouté

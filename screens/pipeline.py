@@ -105,6 +105,13 @@ def render(ctx):
 
     if view == "Board":
 
+        if not prospects:
+            empty_state(
+                "Your pipeline is empty",
+                "Add or import prospects: they enter the first stage and can then be dragged between columns.",
+                [ADD_PROSPECT, IMPORT_CSV], icon=":material/view_kanban:", key="board_empty",
+            )
+
         pipeline_board(
             [
                 {
@@ -148,7 +155,7 @@ def render(ctx):
         if rows:
             st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
         else:
-            st.info("No prospect matches these filters.")
+            no_results("prospect", key="pipeline_table_no_results")
 
     # ---------- VUE PRIORISEE ----------
 
@@ -185,7 +192,11 @@ def render(ctx):
                 hide_index=True
             )
         else:
-            st.success("Nothing urgent: no overdue follow-up and no inactive prospect.")
+            empty_state(
+                "Nothing urgent",
+                "No overdue follow-up and no inactive prospect in open stages.",
+                icon=":material/task_alt:", key="priorities_empty",
+            )
 
     # ---------- GESTION DES ETAPES ----------
 
