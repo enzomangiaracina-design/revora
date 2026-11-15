@@ -105,12 +105,12 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ URL du profil (formulaire, import CSV, fiche, doublons)
 - ✅ Actions LinkedIn (invitation, acceptation, InMail), scoring et performance
 - ⬜ Pas de connecteur : aucune API ouverte ne le permet (à revoir si une intégration Sales Navigator officielle devient disponible)
-## Phase 10 — AI Copilot 🟡
+## Phase 10 — AI Copilot ✅
 - ✅ 10.1 Fiche prospect : préparation d'appel (faits sourcés, hypothèses, questions) et brouillon d'email,
   sur clic, désactivé par défaut, sans coordonnées envoyées, sources vérifiées (v0.25.0)
 - ✅ Fournisseur au choix : Claude ou Google Gemini (offre gratuite, données de démo uniquement) (v0.26.0)
 - ✅ Premier appel réel (Gemini, données de démo) : brief et email corrects et sourcés, ~2 s (v0.26.1)
 - ⬜ Premier appel réel avec Claude (nécessite une clé Anthropic)
-- ⬜ 10.2 Chat sur l'ensemble de la base (plus de données envoyées : à décider)
+- ✅ 10.2 Chat sur l'ensemble de la base : réponses sourcées, lecture seule, hors-sujet refusé (v0.27.0)
 ## Phase 11 — Multi-utilisateur ⬜
 ## Phase 12 — Production (PostgreSQL, hébergement, sécurité, monitoring) ⬜

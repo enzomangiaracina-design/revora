@@ -122,7 +122,7 @@ git clone https://github.com/enzomangiaracina-design/revora.git
 | Settings | Fonctionnel : configuration du scoring, calibration, état des intégrations (non connectées) |
 | Objections | Fonctionnel : saisie, statistiques, playbook de réponses, exemples anonymisés, journal |
 | Performance | Fonctionnel : indicateurs d'activité et de résultats, comparaison de périodes, par verticale |
-| AI Copilot | Phase 10.1 : dans la fiche prospect, préparation d'appel (faits sourcés / hypothèses) et brouillon d'email, sur clic, désactivé par défaut. Chat global : phase 10.2 |
+| AI Copilot | Chat sur toute la base (réponses sourcées, lecture seule) + dans la fiche prospect : préparation d'appel et brouillon d'email. Désactivé par défaut, Claude ou Gemini |
 
 ## Base de données
 

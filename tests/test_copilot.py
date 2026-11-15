@@ -350,3 +350,144 @@ def test_gemini_timeout_is_readable():
 
     with pytest.raises(CopilotError, match="did not answer"):
         gemini_client.generate("s", "p", copilot.EMAIL_SCHEMA, client=client)
+
+
+# ---------- Phase 10.2 : chat sur toute la base ----------
+
+from datetime import date as _date
+
+import screens.copilot
+
+
+def _global(today=_date(2026, 11, 15), **kw):
+    prospects = database.get_all_prospects()
+    return copilot.build_global_context(
+        prospects, {p["id"]: {"global": 42, "temperature": "Warm"} for p in prospects},
+        database.get_all_interactions(), database.get_objections(), database.get_all_tasks(),
+        database.get_stages(), today=today, **kw)
+
+
+def test_global_context_has_no_contact_details_and_sources(record):
+    thomas, call, _ = record
+    database.create_task(thomas, "Envoyer la proposition", "", "2026-11-12")
+    context = _global()
+    text = json.dumps(context["snapshot"], ensure_ascii=False)
+
+    for secret in ("thomas.martin@example.com", "0612345678", "linkedin.com/in/thomas-martins"):
+        assert secret not in text
+    row = context["snapshot"]["prospects"][0]
+    assert row["id"] == f"P{thomas}" and row["score"] == 42
+    assert row["last_touch"]["id"] == f"I{call}" and row["last_touch"]["notes_excerpt"] == "Budget validé en mars"
+    assert row["next_follow_up"] == {"due": "2026-11-12", "title": "Envoyer la proposition", "overdue": True}
+    assert [o["category"] for o in row["open_objections"]] == ["Bad timing"]
+    assert context["labels"][f"I{call}"] == "Call · 10/11 · Thomas Martins"
+    assert context["contacts"][f"I{call}"] == thomas
+    assert context["snapshot"]["totals"]["overdue_follow_ups"] == 1
+
+
+def test_global_context_limit_keeps_priorities_first(temp_db):
+    for i in range(5):
+        database.create_prospect(f"P{i}", "Test", f"Co{i}", "SaaS", None, None, None)
+    ids = [p["id"] for p in database.get_all_prospects()]
+
+    context = _global(limit=2, priority_ids=[ids[3]])
+
+    assert [r["id"] for r in context["snapshot"]["prospects"]][0] == f"P{ids[3]}"
+    assert len(context["snapshot"]["prospects"]) == 2 and context["truncated"]
+    assert context["snapshot"]["totals"]["prospects"] == 5
+
+
+def test_notes_are_cut_to_an_excerpt(thomas):
+    database.add_interaction(thomas, "Note", "Internal", "Other", "Long", "x" * 500, "")
+
+    excerpt = _global()["snapshot"]["prospects"][0]["last_touch"]["notes_excerpt"]
+
+    assert len(excerpt) == copilot.NOTES_EXCERPT + 1 and excerpt.endswith("…")
+
+
+def test_chat_prompt_contains_history_and_question(record):
+    context = _global()
+    history = [{"role": "user", "content": f"q{i}"} for i in range(10)]
+
+    prompt = copilot.build_chat_prompt("Who is hot?", history, context)
+
+    assert prompt.endswith("Question: Who is hot?")
+    assert "USER: q9" in prompt and "USER: q3" not in prompt          # seulement les 6 derniers
+
+
+def test_validate_chat_drops_unsourced_and_lists_cited_prospects(record):
+    thomas, call, _ = record
+    context = _global()
+    data = {"answer": "Follow up with Thomas.",
+            "facts": [{"text": "Thomas has an overdue follow-up.", "sources": [f"I{call}", f"P{thomas}"]},
+                      {"text": "Invented.", "sources": ["P999"]}],
+            "hypotheses": [], "out_of_scope": False}
+
+    result = copilot.validate_chat(data, context)
+
+    assert [f["text"] for f in result["facts"]] == ["Thomas has an overdue follow-up."]
+    assert result["dropped"] == 1 and result["prospects"] == [thomas]
+
+
+# ---------- Interface du chat ----------
+
+def open_copilot():
+    at = AppTest.from_file(MAIN, default_timeout=60).run()
+    at.sidebar.radio[0].set_value(next(o for o in at.sidebar.radio[0].options if o.endswith("AI Copilot"))).run()
+    return at
+
+
+def test_chat_is_off_until_enabled(record, monkeypatch):
+    monkeypatch.setattr(screens.copilot, "ai_is_configured", lambda: True)
+    at = open_copilot()
+
+    assert not at.exception
+    assert "The AI Copilot is off" in " ".join(m.value for m in at.markdown)
+    assert len(at.chat_input) == 0
+
+
+def test_chat_answers_with_sources_and_open_button(record, monkeypatch):
+    thomas, call, _ = record
+    database.set_setting(copilot.SETTING_ENABLED, True)
+    monkeypatch.setattr(screens.copilot, "ai_is_configured", lambda: True)
+    sent = {}
+
+    def fake(system, prompt, schema):
+        sent["prompt"], sent["schema"] = prompt, schema
+        return {"answer": "- Thomas Martins: follow up on the proposal.",
+                "facts": [{"text": "Call on 10/11 about the budget.", "sources": [f"I{call}"]}],
+                "hypotheses": [], "out_of_scope": False}, \
+            {"input_tokens": 900, "output_tokens": 120, "model": "gemini-3.5-flash-lite"}
+
+    monkeypatch.setattr(screens.copilot, "ai_generate", fake)
+
+    at = open_copilot()
+    at.chat_input(key="copilot_input").set_value("Who should I follow up with?").run()
+
+    assert not at.exception
+    assert sent["schema"] is copilot.CHAT_SCHEMA
+    assert "Question: Who should I follow up with?" in sent["prompt"]
+    assert "thomas.martin@example.com" not in sent["prompt"]
+    assert "Thomas Martins: follow up on the proposal." in " ".join(m.value for m in at.markdown)
+    open_button = at.button(key=f"copilot_open_1_{thomas}")
+    assert open_button.label == "Open Thomas Martins"
+
+    open_button.click().run()
+    assert at.session_state["prospect_open"]
+    assert any("Thomas Martins" in t.value for t in at.title)          # la fiche de Thomas est ouverte
+
+
+def test_chat_error_is_shown(record, monkeypatch):
+    database.set_setting(copilot.SETTING_ENABLED, True)
+    monkeypatch.setattr(screens.copilot, "ai_is_configured", lambda: True)
+
+    def failing(system, prompt, schema):
+        raise CopilotError("Gemini is overloaded or unavailable (503).")
+
+    monkeypatch.setattr(screens.copilot, "ai_generate", failing)
+
+    at = open_copilot()
+    at.chat_input(key="copilot_input").set_value("Hello").run()
+
+    assert not at.exception
+    assert any("overloaded" in e.value for e in at.error)

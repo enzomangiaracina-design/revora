@@ -43,7 +43,7 @@ def test_every_page_renders_on_an_empty_database(temp_db, page):
     ("Prospecting Pipeline", "Your pipeline is empty", "Add a prospect"),
     ("Activity", "No activity recorded yet", "Log a call or email"),
     ("Objections", "No objection recorded for this period", "Log a call or email"),
-    ("AI Copilot", "The AI chat is not available yet", "Open Settings"),
+    ("AI Copilot", "The AI Copilot is off", "Open Settings"),
     ("Performance", "No interaction recorded in this period", "Log a call or email"),
 ])
 def test_empty_states_explain_what_to_do_next(temp_db, page, expected_title, expected_button):

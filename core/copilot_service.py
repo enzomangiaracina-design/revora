@@ -15,6 +15,8 @@ prospect ne sont JAMAIS envoyés (inutiles pour préparer un appel).
 
 import json
 
+from core.activity_service import TASK_DONE
+
 MAX_INTERACTIONS = 10
 
 SETTING_ENABLED = "ai_enabled"
@@ -226,3 +228,191 @@ def estimate_cost(usage, input_price=4.0, output_price=20.0):
 
     return round(usage.get("input_tokens", 0) / 1e6 * input_price
                  + usage.get("output_tokens", 0) / 1e6 * output_price, 4)
+
+
+# ==========================================
+# PHASE 10.2 : CHAT SUR TOUTE LA BASE
+# ==========================================
+
+MAX_PROSPECTS = 200
+NOTES_EXCERPT = 200
+CHAT_HISTORY = 6
+
+CHAT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "answer": {"type": "string"},
+        "facts": {"type": "array", "items": _SOURCED_ITEM},
+        "hypotheses": {"type": "array", "items": _SOURCED_ITEM},
+        "out_of_scope": {"type": "boolean"},
+    },
+    "required": ["answer", "facts", "hypotheses", "out_of_scope"],
+    "additionalProperties": False,
+}
+
+CHAT_SYSTEM_PROMPT = """You are the sales copilot inside REVORA, a prospecting tool for SDRs and BDRs.
+You answer the SDR's questions about their own prospects, interactions, follow-ups and objections,
+using ONLY the database snapshot you are given (JSON). Today's date is in the snapshot.
+
+Rules:
+- Every fact in your answer must appear in "facts", each with the ids of the records it comes from
+  (prospects "P12", interactions "I34", objections "O5"). Never state anything that is not in the snapshot.
+- Reasonable guesses go in "hypotheses", worded as hypotheses, with the records that suggest them.
+- "answer": a short, direct answer for a busy SDR (bullet points when listing prospects). It must only
+  restate the facts and hypotheses you list. Do not write record ids (P12, I34…) in the answer:
+  name people and companies instead; the sources are shown separately.
+- If the snapshot does not contain what is needed, say so plainly instead of guessing.
+- If the question has nothing to do with this sales data, set out_of_scope to true and say briefly
+  that you can only help with the REVORA data.
+- You cannot change anything in REVORA: never claim you did.
+- Answer in the language of the question. Notes may be written in French; that is expected."""
+
+
+def build_global_context(prospects, scores, interactions, objections, tasks, stages,
+                         priority_ids=(), today=None, limit=MAX_PROSPECTS):
+    """Instantané de la base envoyé au chat, avec un identifiant par source.
+
+    prospects    : get_all_prospects ; scores : {contact_id: résultat de scoring}
+    interactions : get_all_interactions ; objections : get_objections ; tasks : get_all_tasks
+    priority_ids : prospects prioritaires (envoyés en premier si la base dépasse `limit`).
+    Jamais envoyé : email, téléphone, URL LinkedIn.
+    Retourne {"snapshot", "labels", "contacts", "truncated"} :
+    labels   : identifiant -> libellé lisible ; contacts : identifiant -> contact_id.
+    """
+
+    from collections import Counter
+    from datetime import date
+
+    today = today or date.today()
+    closed = {s["name"] for s in stages if s["is_closed"]}
+    names = {p["id"]: f"{p['first_name']} {p['last_name']}" for p in prospects}
+
+    latest = {}
+    for item in interactions:                       # les plus récentes d'abord
+        latest.setdefault(item["contact_id"], item)
+
+    open_objections = {}
+    for objection in objections:
+        if objection["status"] == "Open":
+            open_objections.setdefault(objection["contact_id"], []).append(objection)
+
+    next_task = {}
+    for task in sorted((t for t in tasks if t["status"] != TASK_DONE),
+                       key=lambda t: (t["due_at"] is None, t["due_at"] or "")):
+        next_task.setdefault(task["contact_id"], task)
+
+    priority = [pid for pid in priority_ids if pid in names]
+    rest = sorted((p["id"] for p in prospects if p["id"] not in set(priority)),
+                  key=lambda pid: latest.get(pid, {}).get("occurred_at_local") or "", reverse=True)
+    order = (priority + rest)[:limit]
+    by_id = {p["id"]: p for p in prospects}
+
+    labels, contacts, rows = {}, {}, []
+
+    for pid in order:
+        p = by_id[pid]
+        source_id = f"P{pid}"
+        labels[source_id] = f"{names[pid]} · {p.get('company_name') or '—'}"
+        contacts[source_id] = pid
+        result = scores.get(pid) or {}
+        row = {
+            "id": source_id,
+            "name": names[pid],
+            "company": p.get("company_name"),
+            "vertical": p.get("vertical"),
+            "job_title": p.get("job_title"),
+            "stage": p.get("status"),
+            "stage_closed": p.get("status") in closed,
+            "owner": p.get("owner") or None,
+            "score": result.get("global"),
+            "temperature": result.get("temperature"),
+            "last_touch": None,
+            "next_follow_up": None,
+            "open_objections": [],
+        }
+
+        touch = latest.get(pid)
+        if touch:
+            iid = f"I{touch['id']}"
+            day = touch["occurred_at_local"][:10]
+            labels[iid] = f"{touch['channel']} · {day[8:10]}/{day[5:7]} · {names[pid]}"
+            contacts[iid] = pid
+            notes = (touch.get("content") or "").strip()
+            row["last_touch"] = {
+                "id": iid, "date": day, "channel": touch["channel"], "direction": touch["direction"],
+                "result": touch["event_type"], "subject": touch.get("subject") or None,
+                "notes_excerpt": notes[:NOTES_EXCERPT] + ("…" if len(notes) > NOTES_EXCERPT else "") or None,
+                "next_step": touch.get("outcome") or None,
+            }
+
+        task = next_task.get(pid)
+        if task:
+            row["next_follow_up"] = {"due": task["due_at"], "title": task["title"],
+                                     "overdue": bool(task["due_at"] and task["due_at"] < today.isoformat())}
+
+        for objection in open_objections.get(pid, []):
+            oid = f"O{objection['id']}"
+            labels[oid] = f"Objection · {objection['category']} · {names[pid]}"
+            contacts[oid] = pid
+            row["open_objections"].append({"id": oid, "category": objection["category"],
+                                           "date": (objection.get("occurred_at_local") or "")[:10]})
+
+        rows.append(row)
+
+    snapshot = {
+        "today": today.isoformat(),
+        "totals": {
+            "prospects": len(prospects),
+            "prospects_in_snapshot": len(rows),
+            "by_stage": dict(Counter(p.get("status") for p in prospects)),
+            "overdue_follow_ups": sum(1 for r in rows if (r["next_follow_up"] or {}).get("overdue")),
+            "objections_by_category": dict(Counter(o["category"] for o in objections)),
+        },
+        "prospects": rows,
+    }
+
+    return {"snapshot": snapshot, "labels": labels, "contacts": contacts,
+            "truncated": len(prospects) > len(rows)}
+
+
+def build_chat_prompt(question, history, context):
+    """Message envoyé au chat : l'instantané, les derniers échanges du chat, puis la question."""
+
+    lines = ["Database snapshot (JSON):", json.dumps(context["snapshot"], ensure_ascii=False, indent=1)]
+
+    recent = history[-CHAT_HISTORY:]
+    if recent:
+        lines.append("\nEarlier in this conversation:")
+        lines += [f"{m['role'].upper()}: {m['content']}" for m in recent]
+
+    lines.append(f"\nQuestion: {question}")
+
+    return "\n".join(lines)
+
+
+def validate_chat(data, context):
+    """Contrôle la réponse du chat : faits sans source réelle écartés.
+
+    Retourne {"answer", "facts", "hypotheses", "out_of_scope", "dropped", "prospects"} ;
+    prospects = contact_id des prospects cités (pour les boutons « Open »), sans doublon.
+    """
+
+    known = set(context["labels"])
+    facts, dropped_facts = _check_items(data.get("facts"), known, require_source=True)
+    hypotheses, dropped_hyp = _check_items(data.get("hypotheses"), known, require_source=False)
+
+    cited = []
+    for item in facts + hypotheses:
+        for source in item["sources"]:
+            pid = context["contacts"].get(source)
+            if pid is not None and pid not in cited:
+                cited.append(pid)
+
+    return {
+        "answer": (data.get("answer") or "").strip(),
+        "facts": facts,
+        "hypotheses": hypotheses,
+        "out_of_scope": bool(data.get("out_of_scope")),
+        "dropped": dropped_facts + dropped_hyp,
+        "prospects": cited,
+    }

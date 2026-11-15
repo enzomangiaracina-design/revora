@@ -1,5 +1,30 @@
 # CHANGELOG — REVORA
 
+## [0.27.0] — 2026-11-15 — Phase 10.2 : chat AI Copilot sur toute la base
+
+### Ajouté
+- Page **AI Copilot** : chat (« Who should I follow up with this week? »…) répondant uniquement à
+  partir des données REVORA :
+  - réponse courte, puis **Sources** dépliables (faits et hypothèses, chacun avec ses
+    enregistrements : « Call · 15/11 · Thomas Martins ») ;
+  - boutons **Open <prospect>** pour ouvrir la fiche des prospects cités ;
+  - question hors sujet → réponse polie (« Je ne peux vous aider que sur les données REVORA ») ;
+  - **lecture seule** : le chat ne modifie rien ; historique gardé dans la session du navigateur ;
+  - questions d'exemple, bouton « New chat », consommation affichée.
+- `core/copilot_service.py` : instantané de la base (jusqu'à 200 prospects, prioritaires d'abord ;
+  étape, score, dernier échange avec **extrait de notes de 200 caractères**, prochaine relance,
+  objections ouvertes, totaux), consignes du chat, schéma de réponse, vérification des sources.
+  Jamais envoyé : email, téléphone, URL LinkedIn. Les 6 derniers messages du chat sont renvoyés.
+
+### Vérifié en réel (Gemini, données de démo, lecture seule)
+- Question métier : 1,9 s, 608 / 245 jetons, faits sourcés, hypothèse séparée, aucun élément écarté.
+- Question hors sujet : refusée poliment, en français.
+- Consigne ajoutée après l'essai : ne pas écrire d'identifiants (P1, I1…) dans la réponse — vérifié.
+
+### Tests
+- 336 tests (8 nouveaux : instantané, extrait, limite et priorités, historique, validation,
+  interface du chat avec faux fournisseur, ouverture d'une fiche, erreur affichée).
+
 ## [0.26.1] — 2026-11-15 — Gemini : plus d'attente sans fin, premier essai réel réussi
 
 ### Corrigé
