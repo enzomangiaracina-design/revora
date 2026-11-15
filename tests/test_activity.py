@@ -66,10 +66,10 @@ def test_duration_ignored_for_emails(thomas):
 
 
 @pytest.mark.parametrize("overrides, expected", [
-    ({"subject": "", "content": "  "}, "objet ou une note"),
-    ({"channel": "Fax"}, "inconnu"),
+    ({"subject": "", "content": "  "}, "subject or a note"),
+    ({"channel": "Fax"}, "Unknown"),
     ({"occurred_at": NOW + timedelta(hours=2)}, "futur"),
-    ({"follow_up_date": date(2026, 11, 13)}, "postérieure"),
+    ({"follow_up_date": date(2026, 11, 13)}, "must be after"),
 ])
 def test_log_rejects_invalid(thomas, overrides, expected):
     ok, message = service.log_interaction(thomas, make(**overrides), now=NOW)
@@ -86,7 +86,7 @@ def test_log_with_follow_up_creates_task(thomas):
     )
 
     task = database.get_tasks(thomas)[0]
-    assert ok and "relance" in message
+    assert ok and "follow-up" in message
     assert task["title"] == "Rappeler mardi"
     assert task["due_at"] == "2026-11-17"
 
@@ -247,7 +247,7 @@ def test_edit_interaction_applies_the_same_rules(thomas):
     assert saved["metadata"] == {"duration_seconds": 240}
 
     ok, message = service.edit_interaction(interaction_id, make(subject="", content=""), now=NOW)
-    assert not ok and message == "Saisissez un objet ou une note."
+    assert not ok and message == "Enter a subject or a note."
     assert database.get_interaction(interaction_id)["subject"] == "Appel corrigé"   # inchangée
 
 
@@ -268,12 +268,12 @@ def test_delete_interaction_keeps_its_objections(thomas):
 
     ok, message = service.remove_interaction(interaction_id)
 
-    assert ok and "1 objection(s) conservée(s)" in message
+    assert ok and "1 objection(s) kept" in message
     assert database.get_interactions(thomas) == []
     objection = database.get_objections(thomas)[0]
     assert (objection["category"], objection["interaction_id"]) == ("No budget", None)
 
 
 def test_unknown_interaction(thomas):
-    assert service.remove_interaction(9999) == (False, "Interaction introuvable.")
-    assert service.edit_interaction(9999, make()) == (False, "Interaction introuvable.")
+    assert service.remove_interaction(9999) == (False, "Interaction not found.")
+    assert service.edit_interaction(9999, make()) == (False, "Interaction not found.")

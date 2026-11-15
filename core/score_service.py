@@ -32,7 +32,7 @@ def save_config(config):
 
     database.set_setting(CONFIG_KEY, config)
 
-    return True, "Configuration du scoring enregistrée. Scores recalculés."
+    return True, "Scoring settings saved. Scores recalculated."
 
 
 def refresh_scores(today=None):

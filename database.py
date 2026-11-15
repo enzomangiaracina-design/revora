@@ -11,23 +11,23 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = BASE_DIR / "revora.db"
 
-# Etapes de prospection creees au premier lancement (modifiables ensuite
-# depuis la page Pipeline). "A prospecter" est la valeur par defaut deja
-# utilisee dans la base : elle est conservee telle quelle.
+# Etapes de prospection creees au premier lancement d'une NOUVELLE base
+# (modifiables ensuite depuis Pipeline > Stages). Une base existante garde
+# ses propres etapes : ces noms ne servent qu'a une base vide.
 DEFAULT_STAGES = [
-    "A prospecter",
-    "Première tentative",
-    "En contact",
-    "Intéressé",
-    "Rendez-vous obtenu",
-    "A relancer",
-    "Non intéressé",
-    "Disqualifié",
+    "To prospect",
+    "First attempt",
+    "In contact",
+    "Interested",
+    "Meeting scheduled",
+    "To follow up",
+    "Not interested",
+    "Disqualified",
 ]
 
 # Etapes "fermees" : le prospect n'est plus a travailler (exclu des priorites
 # et de la detection d'inactivite).
-DEFAULT_CLOSED_STAGES = {"Non intéressé", "Disqualifié"}
+DEFAULT_CLOSED_STAGES = {"Not interested", "Disqualified"}
 
 # Informations de qualification CONFIRMEES par le commercial (cases a cocher
 # sur la fiche prospect). Elles alimentent l'Intent Score.
@@ -80,7 +80,7 @@ def initialize_database():
             email TEXT,
             phone TEXT,
             job_title TEXT,
-            status TEXT DEFAULT 'A prospecter',
+            status TEXT,
             hubspot_id TEXT UNIQUE,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
 
@@ -332,6 +332,16 @@ def _add_column_if_missing(cursor, table, column, column_type):
 # 3. CREATION DES PROSPECTS
 # ==========================================
 
+def _first_stage(connection):
+    """Premiere etape du pipeline (celle d'un prospect cree sans etape)."""
+
+    row = connection.execute(
+        "SELECT name FROM pipeline_stages ORDER BY position, id LIMIT 1"
+    ).fetchone()
+
+    return row[0] if row else DEFAULT_STAGES[0]
+
+
 def _record_stage_change(connection, contact_id, from_stage, to_stage, source):
     """Ajoute une ligne a l'historique des etapes si l'etape change vraiment."""
 
@@ -425,7 +435,7 @@ def create_prospect(
             existing_contact = cursor.fetchone()
 
             if existing_contact:
-                return False, "Cet email existe deja dans REVORA."
+                return False, "This email already exists in REVORA."
 
         # Creation du prospect
         cursor.execute(
@@ -452,7 +462,7 @@ def create_prospect(
                 _clean(email),
                 _clean(phone),
                 _clean(job_title),
-                _clean(status) or "A prospecter",
+                _clean(status) or _first_stage(connection),
                 _clean(source),
                 _clean(owner),
                 _clean(hubspot_id),
@@ -462,7 +472,7 @@ def create_prospect(
 
         connection.commit()
 
-        return True, "Prospect enregistre avec succes."
+        return True, "Prospect created successfully."
 
     except Exception:
         connection.rollback()
@@ -607,7 +617,7 @@ def update_prospect(
             )
 
             if cursor.fetchone():
-                return False, "Cet email existe deja dans REVORA."
+                return False, "This email already exists in REVORA."
 
         company_id = _get_or_create_company(cursor, company_name, vertical)
 
@@ -638,7 +648,7 @@ def update_prospect(
                 _clean(email),
                 _clean(phone),
                 _clean(job_title),
-                _clean(status) or "A prospecter",
+                _clean(status) or _first_stage(connection),
                 _clean(source),
                 _clean(owner),
                 int(linkedin_url is not _UNCHANGED),
@@ -648,15 +658,15 @@ def update_prospect(
         )
 
         if cursor.rowcount == 0:
-            return False, "Prospect introuvable."
+            return False, "Prospect not found."
 
         _record_stage_change(
-            connection, contact_id, previous["status"], _clean(status) or "A prospecter", "edit"
+            connection, contact_id, previous["status"], _clean(status) or _first_stage(connection), "edit"
         )
 
         connection.commit()
 
-        return True, "Prospect mis a jour."
+        return True, "Prospect updated."
 
     except Exception:
         connection.rollback()
@@ -774,13 +784,13 @@ def add_stage(name, is_closed=False):
     name = _clean(name)
 
     if not name:
-        return False, "Le nom de l'etape est obligatoire."
+        return False, "The stage name is required."
 
     connection = get_connection()
 
     try:
         if _stage_name_taken(connection, name):
-            return False, f"L'etape « {name} » existe deja."
+            return False, f"The stage « {name} » already exists."
 
         connection.execute(
             """
@@ -792,7 +802,7 @@ def add_stage(name, is_closed=False):
 
         connection.commit()
 
-        return True, f"Etape « {name} » ajoutee."
+        return True, f"Stage « {name} » added."
 
     finally:
         connection.close()
@@ -804,7 +814,7 @@ def rename_stage(stage_id, new_name):
     new_name = _clean(new_name)
 
     if not new_name:
-        return False, "Le nom de l'etape est obligatoire."
+        return False, "The stage name is required."
 
     connection = get_connection()
 
@@ -814,10 +824,10 @@ def rename_stage(stage_id, new_name):
         ).fetchone()
 
         if not stage:
-            return False, "Etape introuvable."
+            return False, "Stage not found."
 
         if _stage_name_taken(connection, new_name, exclude_id=stage_id):
-            return False, f"L'etape « {new_name} » existe deja."
+            return False, f"The stage « {new_name} » already exists."
 
         connection.execute(
             "UPDATE contacts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE status = ?",
@@ -830,7 +840,7 @@ def rename_stage(stage_id, new_name):
 
         connection.commit()
 
-        return True, f"Etape renommee en « {new_name} »."
+        return True, f"Stage renamed to « {new_name} »."
 
     except Exception:
         connection.rollback()
@@ -901,10 +911,10 @@ def delete_stage(stage_id, move_to=None):
         ).fetchone()
 
         if not stage:
-            return False, "Etape introuvable."
+            return False, "Stage not found."
 
         if connection.execute("SELECT count(*) FROM pipeline_stages").fetchone()[0] <= 1:
-            return False, "Le pipeline doit garder au moins une etape."
+            return False, "The pipeline must keep at least one stage."
 
         count = connection.execute(
             "SELECT count(*) FROM contacts WHERE status = ?", (stage["name"],)
@@ -918,8 +928,8 @@ def delete_stage(stage_id, move_to=None):
 
             if not target:
                 return False, (
-                    f"{count} prospect(s) sont dans « {stage['name']} » : "
-                    "choisissez une etape de destination."
+                    f"{count} prospect(s) are in « {stage['name']} »: "
+                    "choose a destination stage."
                 )
 
             moved = [
@@ -942,7 +952,7 @@ def delete_stage(stage_id, move_to=None):
 
         connection.commit()
 
-        return True, f"Etape « {stage['name']} » supprimee."
+        return True, f"Stage « {stage['name']} » deleted."
 
     except Exception:
         connection.rollback()
@@ -976,14 +986,14 @@ def set_prospect_stage(contact_id, stage_name):
         if not connection.execute(
             "SELECT 1 FROM pipeline_stages WHERE name = ?", (stage_name,)
         ).fetchone():
-            return False, f"Etape inconnue : {stage_name}"
+            return False, f"Unknown stage: {stage_name}"
 
         current = connection.execute(
             "SELECT status FROM contacts WHERE id = ?", (contact_id,)
         ).fetchone()
 
         if not current:
-            return False, "Prospect introuvable."
+            return False, "Prospect not found."
 
         connection.execute(
             "UPDATE contacts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -993,7 +1003,7 @@ def set_prospect_stage(contact_id, stage_name):
 
         connection.commit()
 
-        return True, f"Prospect deplace vers « {stage_name} »."
+        return True, f"Prospect moved to « {stage_name} »."
 
     finally:
         connection.close()
@@ -1229,7 +1239,7 @@ def add_objection(contact_id, category, verbatim=None, *, interaction_id=None,
         ).fetchone()
 
         if not stage:
-            raise ValueError("Prospect introuvable.")
+            raise ValueError("Prospect not found.")
 
         cursor = connection.execute(
             """

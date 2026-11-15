@@ -47,7 +47,7 @@ def test_prospect_is_saved_and_read_back(thomas):
     assert prospect["first_name"] == "Thomas"
     assert prospect["company_name"] == "AlphaEngine"
     assert prospect["vertical"] == "SaaS"
-    assert prospect["status"] == "A prospecter"
+    assert prospect["status"] == "To prospect"
 
 
 def test_unknown_prospect_returns_none(temp_db):
@@ -83,7 +83,7 @@ CREATE TABLE companies (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL
     vertical TEXT, website TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER,
     first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT, phone TEXT,
-    job_title TEXT, status TEXT DEFAULT 'A prospecter', hubspot_id TEXT UNIQUE,
+    job_title TEXT, status TEXT DEFAULT 'To prospect', hubspot_id TEXT UNIQUE,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 INSERT INTO companies (name, vertical) VALUES ('AlphaEngine', 'SaaS');
 INSERT INTO contacts (company_id, first_name, last_name, email)
@@ -120,7 +120,7 @@ def test_migration_adds_columns_and_keeps_data(tmp_path, monkeypatch):
 def test_update_prospect(thomas):
     ok, _ = database.update_prospect(
         thomas, "Thomas", "Martin", "AlphaEngine", "SaaS",
-        "thomas.martin@example.com", "0612345678", "VP Sales", "En contact",
+        "thomas.martin@example.com", "0612345678", "VP Sales", "In contact",
         source="Salon", owner="Enzo",
     )
 
@@ -128,7 +128,7 @@ def test_update_prospect(thomas):
     assert ok
     assert prospect["last_name"] == "Martin"
     assert prospect["job_title"] == "VP Sales"
-    assert prospect["status"] == "En contact"
+    assert prospect["status"] == "In contact"
     assert prospect["source"] == "Salon"
     assert prospect["updated_at"] is not None
 
@@ -138,7 +138,7 @@ def test_update_rejects_email_of_another_contact(thomas):
 
     ok, message = database.update_prospect(
         thomas, "Thomas", "Martins", "AlphaEngine", "SaaS",
-        "JULIE@example.com", None, None, "A prospecter",
+        "JULIE@example.com", None, None, "To prospect",
     )
 
     assert not ok
@@ -147,7 +147,7 @@ def test_update_rejects_email_of_another_contact(thomas):
 
 def test_update_can_move_to_new_company(thomas):
     database.update_prospect(
-        thomas, "Thomas", "Martins", "NewCo", "Finance", None, None, None, "A prospecter"
+        thomas, "Thomas", "Martins", "NewCo", "Finance", None, None, None, "To prospect"
     )
 
     prospect = database.get_prospect_by_id(thomas)
@@ -182,3 +182,15 @@ def test_empty_vertical_does_not_duplicate_company(temp_db):
     connection = sqlite3.connect(temp_db)
     assert connection.execute("SELECT count(*) FROM companies").fetchone()[0] == 1
     connection.close()
+
+
+def test_prospect_without_stage_goes_to_the_real_first_stage(temp_db):
+    """Une base existante garde ses étapes (ex. en français) : pas de nom écrit en dur."""
+
+    first = database.get_stages()[0]
+    database.rename_stage(first["id"], "A prospecter")
+
+    database.create_prospect("Ana", "Lopez", "Acme", "SaaS", None, None, None)
+
+    assert database.get_all_prospects()[0]["status"] == "A prospecter"
+    assert "To prospect" not in database.get_stage_names()      # aucune étape fantôme ajoutée

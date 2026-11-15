@@ -3,7 +3,7 @@
 ## Contexte
 - SaaS de prospection outbound pour SDR/BDR. Prototype Streamlit + SQLite, Python.
 - Le développeur débute en programmation : expliquer chaque modification, les concepts utilisés, et donner les commandes de lancement.
-- Langue de communication : français.
+- Langue de communication : français. **Interface de l'application : anglais** (écrans, messages, aides) ; code et commentaires en français.
 
 ## Règles absolues
 - **Ne jamais supprimer `revora.db`.**
@@ -25,6 +25,7 @@
 
 ## Architecture
 - Identité visuelle : couleurs, police et rayons dans `.streamlit/config.toml` ; jetons et CSS complémentaire dans `ui/theme.py`. Ne jamais ajouter de couleur, rayon, effet ou style d'icône ailleurs (règle du brand kit). Le violet est réservé aux actions, à la navigation active et à la sélection ; vert/orange/rouge/bleu aux états.
+  Palette de référence : le brand kit (`REVORA_Brand_Kit`), avec le gris secondaire lisible `#9295A1` repris du cahier des charges (contraste ≥ 4,5).
 - `database.py` : toute la logique SQL. L'interface (`main.py`, `screens/`) n'exécute jamais de SQL directement.
 - `main.py` : configuration, données communes (`AppContext`), navigation et aiguillage — rien d'autre.
 - `screens/` : une page = un module avec `render(ctx)` ; outils d'interface communs dans `screens/shared.py`,

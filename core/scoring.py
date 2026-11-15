@@ -110,16 +110,16 @@ def validate_config(config):
     weights = config["weights"]
 
     if set(weights) != {"fit", "engagement", "intent"}:
-        errors.append("Les pondérations doivent contenir fit, engagement et intent.")
+        errors.append("Weights must include fit, engagement and intent.")
     elif abs(sum(weights.values()) - 1) > 1e-6 or min(weights.values()) < 0:
-        errors.append("Les pondérations doivent être positives et totaliser 100 %.")
+        errors.append("Weights must be positive and add up to 100 %.")
 
     hot, warm = config["thresholds"]["hot"], config["thresholds"]["warm"]
     if not 0 < warm < hot <= 100:
-        errors.append("Les seuils doivent respecter 0 < Warm < Hot ≤ 100.")
+        errors.append("Thresholds must follow 0 < Warm < Hot ≤ 100.")
 
     if config["half_life_days"] <= 0:
-        errors.append("La demi-vie doit être supérieure à 0 jour.")
+        errors.append("The half-life must be greater than 0 days.")
 
     return errors
 
@@ -277,10 +277,10 @@ def compute_global_score(fit, engagement, intent, weights=None):
     weights = weights or DEFAULT_WEIGHTS
 
     if set(weights) != {"fit", "engagement", "intent"}:
-        raise ValueError("Les pondérations doivent contenir fit, engagement et intent.")
+        raise ValueError("Weights must include fit, engagement and intent.")
 
     if abs(sum(weights.values()) - 1) > 1e-9:
-        raise ValueError("La somme des pondérations doit être égale à 1.")
+        raise ValueError("Weights must add up to 1.")
 
     scores = {"fit": fit, "engagement": engagement, "intent": intent}
 
@@ -304,10 +304,10 @@ def _check_score(name, value):
     """Vérifie qu'un score est un nombre compris entre 0 et 100."""
 
     if not isinstance(value, (int, float)) or isinstance(value, bool):
-        raise TypeError(f"Le score {name} doit être un nombre.")
+        raise TypeError(f"The {name} score must be a number.")
 
     if not 0 <= value <= 100:
-        raise ValueError(f"Le score {name} doit être compris entre 0 et 100.")
+        raise ValueError(f"The {name} score must be between 0 and 100.")
 
 
 def temperature(global_score, config=None):

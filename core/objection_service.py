@@ -66,7 +66,7 @@ def record_objection(contact_id, category, verbatim=None, *, interaction_id=None
     category = (category or "").strip()
 
     if not category:
-        return False, "Choisissez une catégorie d'objection."
+        return False, "Choose an objection category."
 
     when = occurred_at.strftime("%Y-%m-%d %H:%M:%S") if occurred_at else None
 
@@ -76,7 +76,7 @@ def record_objection(contact_id, category, verbatim=None, *, interaction_id=None
         source = next((i for i in database.get_interactions(contact_id) if i["id"] == interaction_id), None)
 
         if not source:
-            return False, "Cet échange n'appartient pas à ce prospect."
+            return False, "This interaction does not belong to this prospect."
 
         when = when or source["occurred_at_local"]
 
@@ -88,7 +88,7 @@ def record_objection(contact_id, category, verbatim=None, *, interaction_id=None
         occurred_at=when,
     )
 
-    return True, f"Objection enregistrée : {category}."
+    return True, f"Objection saved: {category}."
 
 
 def change_category(objection_id, category):
@@ -97,12 +97,12 @@ def change_category(objection_id, category):
     category = (category or "").strip()
 
     if not category:
-        return False, "Choisissez une catégorie d'objection."
+        return False, "Choose an objection category."
 
     if not database.set_objection_category(objection_id, category):
-        return False, "Objection introuvable."
+        return False, "Objection not found."
 
-    return True, f"Catégorie corrigée : {category}."
+    return True, f"Category updated: {category}."
 
 
 def interaction_label(channel, subject, at_local):

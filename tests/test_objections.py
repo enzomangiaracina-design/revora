@@ -19,15 +19,15 @@ def objection(category, day="2026-11-10", status="Open", verbatim=None, **extra)
 # ---------- Enregistrement ----------
 
 def test_record_objection_keeps_stage_at_that_time(thomas):
-    database.set_prospect_stage(thomas, "En contact")
+    database.set_prospect_stage(thomas, "In contact")
 
     ok, _ = service.record_objection(thomas, " No budget ", "Pas de budget avant mars")
-    database.set_prospect_stage(thomas, "Intéressé")
+    database.set_prospect_stage(thomas, "Interested")
 
     saved = database.get_objections(thomas)[0]
     assert ok
     assert (saved["category"], saved["stage"], saved["status"], saved["source"]) == (
-        "No budget", "En contact", "Open", "manual")
+        "No budget", "In contact", "Open", "manual")
     assert saved["verbatim"] == "Pas de budget avant mars"
     assert saved["company_name"] == "AlphaEngine"
 
@@ -35,7 +35,7 @@ def test_record_objection_keeps_stage_at_that_time(thomas):
 def test_record_objection_requires_category(thomas):
     ok, message = service.record_objection(thomas, "  ")
 
-    assert not ok and "catégorie" in message
+    assert not ok and "category" in message
     assert database.get_objections() == []
 
 
@@ -99,10 +99,10 @@ def test_playbook_responses(temp_db):
 # ---------- Statistiques ----------
 
 SAMPLE = [
-    objection("No budget", "2026-11-13", "Handled", vertical="SaaS", stage="En contact"),
-    objection("No budget", "2026-11-03", "Open", vertical="Finance", stage="Intéressé"),
-    objection("Bad timing", "2026-11-12", "Lost", vertical="SaaS", stage="En contact"),
-    objection("Competitor solution", "2026-08-01", "Open", vertical=None, stage="En contact"),
+    objection("No budget", "2026-11-13", "Handled", vertical="SaaS", stage="In contact"),
+    objection("No budget", "2026-11-03", "Open", vertical="Finance", stage="Interested"),
+    objection("Bad timing", "2026-11-12", "Lost", vertical="SaaS", stage="In contact"),
+    objection("Competitor solution", "2026-08-01", "Open", vertical=None, stage="In contact"),
 ]
 
 
@@ -228,7 +228,7 @@ def test_interaction_of_another_prospect_is_refused(thomas):
 
     ok, message = service.record_objection(thomas, "No budget", interaction_id=other_call)
 
-    assert not ok and "n'appartient pas" in message
+    assert not ok and "does not belong" in message
     assert database.get_objections(thomas) == []
 
 
@@ -242,10 +242,10 @@ def test_change_category(thomas):
     service.record_objection(thomas, "No budget")
     objection_id = database.get_objections(thomas)[0]["id"]
 
-    assert service.change_category(objection_id, "  Price too high ") == (True, "Catégorie corrigée : Price too high.")
+    assert service.change_category(objection_id, "  Price too high ") == (True, "Category updated: Price too high.")
     assert database.get_objections(thomas)[0]["category"] == "Price too high"
     assert service.change_category(objection_id, " ")[0] is False
-    assert service.change_category(9999, "No budget") == (False, "Objection introuvable.")
+    assert service.change_category(9999, "No budget") == (False, "Objection not found.")
 
 
 def test_interaction_label_without_subject():

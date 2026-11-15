@@ -1,5 +1,31 @@
 # CHANGELOG — REVORA
 
+## [0.24.0] — 2026-11-15 — Palette et langue harmonisées
+
+### Décisions
+- **Palette de référence : le brand kit**, avec un seul emprunt au cahier des charges : le gris
+  secondaire lisible **#9295A1** (contraste 6,6 sur le fond, contre 4,1 pour l'ancien #6B7280,
+  sous le minimum recommandé de 4,5 pour du petit texte).
+- **Interface entièrement en anglais.** Le code et ses commentaires restent en français.
+
+### Modifié
+- `ui/theme.py`, `ui/kanban.py`, `.streamlit/config.toml` : texte secondaire en #9295A1 via le jeton
+  `COLORS["gray"]` (les gris #9CA3AF écrits en dur ont disparu).
+- Environ 70 messages traduits (confirmations, erreurs de saisie, doublons, import CSV, étapes,
+  scoring) : « Interaction enregistrée » → « Interaction saved », « Prospect deplace vers… » →
+  « Prospect moved to… », etc.
+- **Étapes par défaut des nouvelles bases** en anglais (To prospect, First attempt, In contact,
+  Interested, Meeting scheduled, To follow up, Not interested, Disqualified).
+  **Votre base garde ses étapes actuelles** (données non modifiées) : renommez-les dans
+  Pipeline › Stages si vous le souhaitez.
+- Un prospect créé sans étape va dans la **première étape réelle** du pipeline (et non plus dans
+  « A prospecter » écrit en dur, qui aurait créé une étape fantôme dans une base renommée).
+- Les en-têtes CSV en français (prénom, société, téléphone…) restent reconnus à l'import.
+
+### Tests
+- 303 tests (1 nouveau ; attentes de messages et d'étapes mises à jour). Les 9 pages rendues sans
+  erreur sur une **copie** de la base réelle, étapes françaises intactes. `revora.db` non modifiée.
+
 ## [0.23.0] — 2026-11-15 — Corriger les saisies
 
 ### Ajouté

@@ -31,7 +31,7 @@ COLORS = {
     "violet": "#7C3AED",    # accent soutenu : actions, navigation active, sélection
     "night": "#0B0B12",     # fond principal
     "slate": "#1A1A24",     # surfaces
-    "gray": "#6B7280",      # texte secondaire
+    "gray": "#9295A1",      # texte secondaire (gris lisible du cahier des charges : contraste suffisant)
     "white": "#F8FAFC",     # texte principal
     "border": "#262633",    # bordure discrète
 }
@@ -79,7 +79,7 @@ div[data-testid="stMetric"] {{
 }}
 
 div[data-testid="stMetricLabel"] p {{
-    color: #9CA3AF;
+    color: {COLORS["gray"]};
     font-weight: 500;
 }}
 
@@ -162,7 +162,7 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"][data-selecte
 
 /* Titres de section compacts (Overview) */
 .revora-section {{
-    color: #9CA3AF;
+    color: {COLORS["gray"]};
     font-size: 0.74rem;
     font-weight: 600;
     letter-spacing: 0.12em;

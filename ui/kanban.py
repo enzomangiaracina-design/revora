@@ -51,7 +51,7 @@ CSS = f"""
 }}
 
 .column-header .count {{
-    color: #9CA3AF;
+    color: {COLORS["gray"]};
     font-weight: 600;
 }}
 
@@ -119,7 +119,7 @@ CSS = f"""
     line-height: 1.55;
 }}
 
-.field .label {{ color: #9CA3AF; }}
+.field .label {{ color: {COLORS["gray"]}; }}
 .field.overdue .value {{ color: #F87171; }}
 .field.stale .value {{ color: #FBBF24; }}
 
@@ -174,7 +174,7 @@ CSS = f"""
     background: none;
     border: 1px solid transparent;
     border-radius: {RADIUS_CONTROL};
-    color: #9CA3AF;
+    color: {COLORS["gray"]};
     padding: 4px;
     cursor: pointer;
     display: flex;

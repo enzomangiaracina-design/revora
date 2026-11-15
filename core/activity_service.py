@@ -62,28 +62,28 @@ def _validate(data, now):
     follow_up_date = data.get("follow_up_date")
 
     if data.get("channel") not in CHANNELS:
-        return "Type d'interaction inconnu.", None
+        return "Unknown interaction type.", None
 
     event_type = data.get("event_type") or "Other"
     direction = data.get("direction")
 
     if event_type in LINKEDIN_RESULTS:
         if data["channel"] != "LinkedIn":
-            return f"« {event_type} » n'existe que pour le type LinkedIn.", None
+            return f"« {event_type} » only exists for the LinkedIn type.", None
 
         direction = LINKEDIN_RESULTS[event_type]
         # Une action LinkedIn se suffit à elle-même : l'objet est facultatif
         subject = subject or event_type
 
     if not subject and not content:
-        return "Saisissez un objet ou une note.", None
+        return "Enter a subject or a note.", None
 
     # Une marge d'une minute couvre l'écart entre l'heure affichée et le clic
     if occurred_at > now + timedelta(minutes=1):
-        return "La date de l'interaction ne peut pas être dans le futur.", None
+        return "The interaction date cannot be in the future.", None
 
     if follow_up_date and follow_up_date < occurred_at.date():
-        return "La date de relance doit être postérieure à l'interaction.", None
+        return "The follow-up date must be after the interaction.", None
 
     metadata = {}
     duration = data.get("duration_minutes") or 0
@@ -127,7 +127,7 @@ def log_interaction(contact_id, data, now=None):
         metadata=clean["metadata"],
     )
 
-    done = ["Interaction enregistrée"]
+    done = ["Interaction saved"]
 
     objection = (data.get("objection_category") or "").strip()
 
@@ -139,14 +139,14 @@ def log_interaction(contact_id, data, now=None):
             interaction_id=interaction_id,
             occurred_at=clean["occurred_at"],
         )
-        done.append(f"objection « {objection} » notée")
+        done.append(f"objection « {objection} » noted")
 
     follow_up_date = data.get("follow_up_date")
 
     if follow_up_date:
         title = clean["outcome"] or f"Follow up after {data['channel'].lower()}"
         database.create_task(contact_id, title, clean["content"], follow_up_date.isoformat())
-        done.append("relance planifiée")
+        done.append("follow-up scheduled")
 
     return True, ", ".join(done) + "."
 
@@ -163,10 +163,10 @@ def edit_interaction(interaction_id, data, now=None):
     current = database.get_interaction(interaction_id)
 
     if not current:
-        return False, "Interaction introuvable."
+        return False, "Interaction not found."
 
     if not is_editable(current):
-        return False, f"Cette interaction vient de {source_label(current['provider'])} : corrigez-la à la source."
+        return False, f"This interaction comes from {source_label(current['provider'])}: correct it at the source."
 
     error, clean = _validate(data, now or datetime.now())
 
@@ -175,7 +175,7 @@ def edit_interaction(interaction_id, data, now=None):
 
     database.update_interaction(interaction_id, **clean)
 
-    return True, "Interaction corrigée."
+    return True, "Interaction updated."
 
 
 def remove_interaction(interaction_id):
@@ -184,16 +184,16 @@ def remove_interaction(interaction_id):
     current = database.get_interaction(interaction_id)
 
     if not current:
-        return False, "Interaction introuvable."
+        return False, "Interaction not found."
 
     if not is_editable(current):
-        return False, f"Cette interaction vient de {source_label(current['provider'])} : elle ne peut pas être supprimée ici."
+        return False, f"This interaction comes from {source_label(current['provider'])}: it cannot be deleted here."
 
     result = database.delete_interaction(interaction_id)
-    message = "Interaction supprimée."
+    message = "Interaction deleted."
 
     if result["objections_unlinked"]:
-        message += f" {result['objections_unlinked']} objection(s) conservée(s), sans lien vers cet échange."
+        message += f" {result['objections_unlinked']} objection(s) kept, no longer linked to it."
 
     return True, message
 

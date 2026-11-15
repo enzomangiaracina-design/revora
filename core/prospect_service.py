@@ -46,7 +46,7 @@ REQUIRED_CSV_FIELDS = ["first_name", "last_name", "company_name"]
 
 CSV_TEMPLATE = (
     "first_name,last_name,company_name,vertical,email,phone,job_title,status,source,owner\n"
-    "Marie,Dupont,Exemple SAS,SaaS,marie.dupont@example.com,0611223344,CEO,A prospecter,Salon,\n"
+    "Marie,Dupont,Exemple SAS,SaaS,marie.dupont@example.com,0611223344,CEO,To prospect,Trade show,\n"
 )
 
 
@@ -67,28 +67,28 @@ def validate_prospect(data, statuses=None):
     errors = []
 
     for field, label in [
-        ("first_name", "Le prénom"),
-        ("last_name", "Le nom"),
-        ("company_name", "L'entreprise"),
+        ("first_name", "First name"),
+        ("last_name", "Last name"),
+        ("company_name", "Company"),
     ]:
         if not (data.get(field) or "").strip():
-            errors.append(f"{label} est obligatoire.")
+            errors.append(f"{label} is required.")
 
     email = (data.get("email") or "").strip()
     if email and not EMAIL_PATTERN.match(email):
-        errors.append(f"Email invalide : {email}")
+        errors.append(f"Invalid email: {email}")
 
     phone = (data.get("phone") or "").strip()
     if phone and normalize_phone(phone) is None:
-        errors.append(f"Téléphone invalide : {phone}")
+        errors.append(f"Invalid phone number: {phone}")
 
     linkedin = (data.get("linkedin_url") or "").strip()
     if linkedin and normalize_linkedin_url(linkedin) is None:
-        errors.append(f"URL LinkedIn invalide (profil attendu : linkedin.com/in/…) : {linkedin}")
+        errors.append(f"Invalid LinkedIn URL (expected a profile: linkedin.com/in/…): {linkedin}")
 
     status = (data.get("status") or "").strip()
     if status and status not in statuses:
-        errors.append(f"Statut inconnu : {status}")
+        errors.append(f"Unknown stage: {status}")
 
     return errors
 
@@ -111,15 +111,15 @@ def find_duplicate(data, prospects, exclude_id=None):
             continue
 
         if email and normalize_email(prospect.get("email")) == email:
-            return prospect, "même email"
+            return prospect, "same email"
 
         if linkedin and normalize_linkedin_url(prospect.get("linkedin_url")) == linkedin:
-            return prospect, "même profil LinkedIn"
+            return prospect, "same LinkedIn profile"
 
         if identity == _identity(
             prospect.get("first_name"), prospect.get("last_name"), prospect.get("company_name")
         ):
-            return prospect, "même nom et même entreprise"
+            return prospect, "same name and company"
 
     return None, None
 
@@ -154,7 +154,7 @@ def create_prospect(data):
     duplicate, reason = find_duplicate(data, database.get_all_prospects())
     if duplicate:
         return False, (
-            f"Doublon ({reason}) : {duplicate['first_name']} {duplicate['last_name']}"
+            f"Duplicate ({reason}): {duplicate['first_name']} {duplicate['last_name']}"
             f" — {duplicate['company_name']}."
         )
 
@@ -187,7 +187,7 @@ def update_prospect(contact_id, data):
     duplicate, reason = find_duplicate(data, database.get_all_prospects(), exclude_id=contact_id)
     if duplicate:
         return False, (
-            f"Doublon ({reason}) : {duplicate['first_name']} {duplicate['last_name']}"
+            f"Duplicate ({reason}): {duplicate['first_name']} {duplicate['last_name']}"
             f" — {duplicate['company_name']}."
         )
 
@@ -287,14 +287,14 @@ def read_prospect_csv(file):
         text = raw
 
     if not text.strip():
-        raise ValueError("Le fichier est vide.")
+        raise ValueError("The file is empty.")
 
     try:
         df = pd.read_csv(
             io.StringIO(text), sep=None, engine="python", dtype=str, keep_default_na=False
         )
     except Exception as error:
-        raise ValueError(f"Fichier CSV illisible : {error}") from error
+        raise ValueError(f"Unreadable CSV file: {error}") from error
 
     alias_to_field = {
         alias: field for field, aliases in COLUMN_ALIASES.items() for alias in aliases
@@ -315,8 +315,8 @@ def read_prospect_csv(file):
     missing = [field for field in REQUIRED_CSV_FIELDS if field not in df.columns]
     if missing:
         raise ValueError(
-            "Colonnes obligatoires manquantes : " + ", ".join(missing)
-            + ". Téléchargez le modèle CSV pour voir le format attendu."
+            "Missing required columns: " + ", ".join(missing)
+            + ". Download the CSV template to see the expected format."
         )
 
     return df, ignored
@@ -350,7 +350,7 @@ def import_prospects(df, default_source="Import CSV"):
         if duplicate:
             report["duplicates"].append({
                 "line": line,
-                "reason": f"{reason} que {duplicate['first_name']} {duplicate['last_name']}",
+                "reason": f"{reason} as {duplicate['first_name']} {duplicate['last_name']}",
             })
             continue
 

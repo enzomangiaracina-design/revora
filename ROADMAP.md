@@ -53,6 +53,10 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ✅ Logo, monogramme, favicon (raster provisoires issus du brand kit)
 - ⬜ Logo vectoriel SVG définitif (à fournir), icônes Lucide (nécessite une interface hors Streamlit)
 
+## Décisions de design ✅ (v0.24.0)
+- ✅ Palette : brand kit + gris secondaire lisible #9295A1
+- ✅ Langue de l'interface : anglais
+
 ## Phase 6 — HubSpot et Gmail ⏸ (en pause)
 - ✅ Vérification des API dans la documentation officielle (`docs/INTEGRATIONS.md`)
 - ✅ Connecteurs HubSpot (appels, emails, contacts) et Gmail (en-têtes) — hors ligne, testés avec données fictives

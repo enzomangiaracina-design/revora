@@ -22,7 +22,7 @@ def test_default_stages_are_seeded(temp_db):
     stages = database.get_stages()
 
     assert [s["name"] for s in stages] == database.DEFAULT_STAGES
-    assert {s["name"] for s in stages if s["is_closed"]} == {"Non intéressé", "Disqualifié"}
+    assert {s["name"] for s in stages if s["is_closed"]} == {"Not interested", "Disqualified"}
 
 
 def test_seeding_is_idempotent(thomas):
@@ -58,14 +58,14 @@ def test_add_stage(temp_db):
     assert database.get_stage_names()[-1] == "Démo planifiée"
 
     ok, message = database.add_stage("démo PLANIFIÉE ")
-    assert not ok and "existe" in message
+    assert not ok and "already exists" in message
 
     ok, _ = database.add_stage("   ")
     assert not ok
 
 
 def test_rename_stage_updates_prospects(thomas):
-    ok, _ = database.rename_stage(stage_id("A prospecter"), "Nouveau lead")
+    ok, _ = database.rename_stage(stage_id("To prospect"), "Nouveau lead")
 
     assert ok
     assert database.get_stage_names()[0] == "Nouveau lead"
@@ -73,68 +73,68 @@ def test_rename_stage_updates_prospects(thomas):
 
 
 def test_rename_stage_refuses_existing_name(thomas):
-    ok, _ = database.rename_stage(stage_id("A prospecter"), "en contact")
+    ok, _ = database.rename_stage(stage_id("To prospect"), "in CONTACT")
 
     assert not ok
-    assert database.get_prospect_by_id(thomas)["status"] == "A prospecter"
+    assert database.get_prospect_by_id(thomas)["status"] == "To prospect"
 
 
 def test_move_stage(temp_db):
-    assert database.move_stage(stage_id("En contact"), -1)
-    assert database.get_stage_names()[1:3] == ["En contact", "Première tentative"]
+    assert database.move_stage(stage_id("In contact"), -1)
+    assert database.get_stage_names()[1:3] == ["In contact", "First attempt"]
 
     # La première étape ne peut pas aller plus à gauche
-    assert not database.move_stage(stage_id("A prospecter"), -1)
+    assert not database.move_stage(stage_id("To prospect"), -1)
 
 
 def test_set_stage_closed(temp_db):
-    database.set_stage_closed(stage_id("A relancer"), True)
+    database.set_stage_closed(stage_id("To follow up"), True)
 
-    assert next(s for s in database.get_stages() if s["name"] == "A relancer")["is_closed"]
+    assert next(s for s in database.get_stages() if s["name"] == "To follow up")["is_closed"]
 
 
 def test_delete_empty_stage(temp_db):
-    ok, _ = database.delete_stage(stage_id("A relancer"))
+    ok, _ = database.delete_stage(stage_id("To follow up"))
 
     assert ok
-    assert "A relancer" not in database.get_stage_names()
+    assert "To follow up" not in database.get_stage_names()
 
 
 def test_delete_stage_with_prospects_requires_target(thomas):
-    ok, message = database.delete_stage(stage_id("A prospecter"))
+    ok, message = database.delete_stage(stage_id("To prospect"))
 
     assert not ok and "destination" in message
-    assert "A prospecter" in database.get_stage_names()
+    assert "To prospect" in database.get_stage_names()
 
-    ok, _ = database.delete_stage(stage_id("A prospecter"), move_to="En contact")
+    ok, _ = database.delete_stage(stage_id("To prospect"), move_to="In contact")
 
     assert ok
-    assert database.get_prospect_by_id(thomas)["status"] == "En contact"
+    assert database.get_prospect_by_id(thomas)["status"] == "In contact"
 
 
 def test_cannot_delete_last_stage(temp_db):
     for name in database.DEFAULT_STAGES[1:]:
         database.delete_stage(stage_id(name))
 
-    ok, message = database.delete_stage(stage_id("A prospecter"))
+    ok, message = database.delete_stage(stage_id("To prospect"))
 
-    assert not ok and "au moins une" in message
+    assert not ok and "at least one" in message
 
 
 def test_set_prospect_stage(thomas):
-    ok, _ = database.set_prospect_stage(thomas, "Intéressé")
+    ok, _ = database.set_prospect_stage(thomas, "Interested")
     assert ok
-    assert database.get_prospect_by_id(thomas)["status"] == "Intéressé"
+    assert database.get_prospect_by_id(thomas)["status"] == "Interested"
 
     ok, _ = database.set_prospect_stage(thomas, "Inventée")
     assert not ok
-    assert database.get_prospect_by_id(thomas)["status"] == "Intéressé"
+    assert database.get_prospect_by_id(thomas)["status"] == "Interested"
 
 
 # ---------- Statuts dynamiques dans le service prospects ----------
 
 def test_custom_stage_accepted_and_first_stage_is_default(temp_db):
-    database.rename_stage(stage_id("A prospecter"), "Lead")
+    database.rename_stage(stage_id("To prospect"), "Lead")
     database.add_stage("Démo")
 
     ok, _ = prospect_service.create_prospect({
@@ -158,10 +158,10 @@ def test_filter_by_owner():
 # ---------- Tableau, inactivité, priorités (fonctions pures) ----------
 
 STAGES = [
-    {"name": "A prospecter", "is_closed": False},
-    {"name": "En contact", "is_closed": False},
-    {"name": "Intéressé", "is_closed": False},
-    {"name": "Disqualifié", "is_closed": True},
+    {"name": "To prospect", "is_closed": False},
+    {"name": "In contact", "is_closed": False},
+    {"name": "Interested", "is_closed": False},
+    {"name": "Disqualified", "is_closed": True},
 ]
 
 
@@ -170,11 +170,11 @@ def p(pid, status):
 
 
 def test_build_board():
-    board = pipeline.build_board([p(1, "En contact"), p(2, "Inconnu"), p(3, "En contact")], STAGES)
+    board = pipeline.build_board([p(1, "In contact"), p(2, "Inconnu"), p(3, "In contact")], STAGES)
 
-    assert [x["id"] for x in board["En contact"]] == [1, 3]
-    assert [x["id"] for x in board["A prospecter"]] == [2]  # statut inconnu : pas masqué
-    assert board["Disqualifié"] == []
+    assert [x["id"] for x in board["In contact"]] == [1, 3]
+    assert [x["id"] for x in board["To prospect"]] == [2]  # statut inconnu : pas masqué
+    assert board["Disqualified"] == []
 
 
 @pytest.mark.parametrize("last, expected", [
@@ -193,8 +193,8 @@ def test_is_stale():
 
 
 def test_prioritize():
-    prospects = [p(1, "A prospecter"), p(2, "Intéressé"), p(3, "En contact"),
-                 p(4, "Disqualifié"), p(5, "En contact"), p(6, "Intéressé")]
+    prospects = [p(1, "To prospect"), p(2, "Interested"), p(3, "In contact"),
+                 p(4, "Disqualified"), p(5, "In contact"), p(6, "Interested")]
     summaries = {
         1: {},                                                        # jamais contacté : 1
         2: {"last_interaction_at": "2026-11-13 10:00:00",
@@ -214,7 +214,7 @@ def test_prioritize():
 
 
 def test_prioritize_ties_broken_by_score():
-    prospects = [p(1, "A prospecter"), p(2, "A prospecter")]
+    prospects = [p(1, "To prospect"), p(2, "To prospect")]
     ranked = pipeline.prioritize(prospects, STAGES, {}, today=TODAY, scores={1: 20, 2: 65})
 
     assert [r["prospect"]["id"] for r in ranked] == [2, 1]
@@ -230,11 +230,11 @@ SUMMARIES = {
 
 PROSPECTS_HS = [
     {"id": 1, "first_name": "Ana", "last_name": "Lopez", "company_name": "Zeta", "owner": "Léa",
-     "created_at": "2026-11-14 08:00:00", "created_at_local": "2026-11-14 09:00:00", "status": "A prospecter"},
+     "created_at": "2026-11-14 08:00:00", "created_at_local": "2026-11-14 09:00:00", "status": "To prospect"},
     {"id": 2, "first_name": "bob", "last_name": "ray", "company_name": "alpha", "owner": None,
-     "created_at": "2026-10-20 08:00:00", "created_at_local": "2026-10-20 10:00:00", "status": "En contact"},
+     "created_at": "2026-10-20 08:00:00", "created_at_local": "2026-10-20 10:00:00", "status": "In contact"},
     {"id": 3, "first_name": "Chloé", "last_name": "", "company_name": None, "owner": "Léa",
-     "created_at": "2026-11-10 08:00:00", "created_at_local": "2026-11-10 09:00:00", "status": "A prospecter"},
+     "created_at": "2026-11-10 08:00:00", "created_at_local": "2026-11-10 09:00:00", "status": "To prospect"},
 ]
 
 SCORES = {1: {"global": 30, "temperature": "Cold"}, 2: {"global": 75, "temperature": "Hot"},

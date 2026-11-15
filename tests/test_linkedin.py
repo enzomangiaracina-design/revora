@@ -55,10 +55,10 @@ def test_create_stores_normalized_url_and_detects_duplicate(temp_db):
 
 def test_update_keeps_url_when_not_provided(thomas):
     database.update_prospect(thomas, "Thomas", "Martins", "AlphaEngine", "SaaS", None, None, None,
-                             "A prospecter", linkedin_url="https://www.linkedin.com/in/thomas")
+                             "To prospect", linkedin_url="https://www.linkedin.com/in/thomas")
     # Ancien appel, sans l'argument : l'URL ne doit pas être effacée
     database.update_prospect(thomas, "Thomas", "Martins", "AlphaEngine", "SaaS", None, None, None,
-                             "En contact")
+                             "In contact")
 
     assert database.get_prospect_by_id(thomas)["linkedin_url"] == "https://www.linkedin.com/in/thomas"
 

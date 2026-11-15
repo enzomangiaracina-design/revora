@@ -87,20 +87,20 @@ def test_reason_detail_gives_source_and_date(summary, prospect, expected):
 def test_focus_rows():
     ranked = [
         {"prospect": {"id": 1, "first_name": "Ana", "last_name": "Lopez", "company_name": "Zeta",
-                      "status": "En contact", "phone": "0611"},
+                      "status": "In contact", "phone": "0611"},
          "points": 3, "reasons": ["Overdue follow-up (2026-11-12): Rappel"],
          "summary": {"next_task_title": "Rappel", "next_task_due": "2026-11-12", "next_task_id": 4,
                      "next_task_created_at": "2026-11-09 08:00:00",
                      "last_interaction_at": "2026-11-14 16:20:00", "last_channel": "Call"}},
         {"prospect": {"id": 2, "first_name": "Bob", "last_name": "Ray", "company_name": None,
-                      "status": "A prospecter"},
+                      "status": "To prospect"},
          "points": 1, "reasons": ["Never contacted"], "summary": {}},
     ]
 
     rows = overview.focus_rows(ranked, {1: {"global": 56, "temperature": "Warm"}}, limit=5, today=TODAY)
 
     assert rows[0] == {
-        "id": 1, "priority": "High", "prospect": "Ana Lopez", "company": "Zeta", "stage": "En contact",
+        "id": 1, "priority": "High", "prospect": "Ana Lopez", "company": "Zeta", "stage": "In contact",
         "score": 56, "temperature": "Warm", "last_interaction": "Yesterday 16:20",
         "action_type": "Follow up", "next_action": "Follow-up: Rappel",
         "due": "Overdue 3 d", "due_state": "overdue",

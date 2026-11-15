@@ -92,7 +92,7 @@ def test_streamlit_reruns_are_not_caught_by_the_error_guard(thomas):
 
     assert not at.exception
     assert "This page hit an unexpected error" not in texts(at)
-    assert any("succes" in s.value for s in at.success)
+    assert any("successfully" in s.value for s in at.success)
 
 
 # ---------- P1 : actions rapides du Today's Focus ----------
@@ -240,30 +240,30 @@ def open_file(contact_id):
 def test_open_stage_moves_immediately(focus_data):
     paul = focus_data["Paul"]
     at = open_file(paul)
-    at.selectbox(key=f"stage_select_{paul}").set_value("En contact").run()
+    at.selectbox(key=f"stage_select_{paul}").set_value("In contact").run()
 
-    assert database.get_prospect_by_id(paul)["status"] == "En contact"
+    assert database.get_prospect_by_id(paul)["status"] == "In contact"
     assert not at.exception
 
 
 def test_closed_stage_asks_for_confirmation(focus_data):
     paul = focus_data["Paul"]
     at = open_file(paul)
-    at.selectbox(key=f"stage_select_{paul}").set_value("Disqualifié").run()
+    at.selectbox(key=f"stage_select_{paul}").set_value("Disqualified").run()
 
     # Rien n'est appliqué tant que ce n'est pas confirmé ; le sélecteur reste sur l'étape actuelle
-    assert database.get_prospect_by_id(paul)["status"] == "A prospecter"
-    assert at.selectbox(key=f"stage_select_{paul}").value == "A prospecter"
+    assert database.get_prospect_by_id(paul)["status"] == "To prospect"
+    assert at.selectbox(key=f"stage_select_{paul}").value == "To prospect"
     assert "to the closed stage" in texts(at)
 
     at.button(key="stage_change_cancel").click().run()
-    assert database.get_prospect_by_id(paul)["status"] == "A prospecter"
+    assert database.get_prospect_by_id(paul)["status"] == "To prospect"
     assert "to the closed stage" not in texts(at)
 
-    at.selectbox(key=f"stage_select_{paul}").set_value("Disqualifié").run()
+    at.selectbox(key=f"stage_select_{paul}").set_value("Disqualified").run()
     at.button(key="stage_change_confirm").click().run()
-    assert database.get_prospect_by_id(paul)["status"] == "Disqualifié"
-    assert [c["to_stage"] for c in database.get_stage_changes(paul)] == ["Disqualifié"]
+    assert database.get_prospect_by_id(paul)["status"] == "Disqualified"
+    assert [c["to_stage"] for c in database.get_stage_changes(paul)] == ["Disqualified"]
     assert not at.exception
 
 
@@ -293,7 +293,7 @@ def test_interaction_form_keeps_input_on_error_and_clears_on_success(focus_data)
     [b for b in at.button if b.label == "Save interaction"][0].click().run()
 
     # Erreur (ni objet ni note) : le champ saisi est toujours là
-    assert any("objet ou une note" in e.value for e in at.error)
+    assert any("subject or a note" in e.value for e in at.error)
     assert _log_form(at)[1]["Next step"].value == "Rappeler mardi"
 
     _log_form(at)[1]["Subject"].set_value("Premier appel")

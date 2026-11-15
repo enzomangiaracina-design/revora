@@ -12,45 +12,45 @@ def stage_id(name):
 # ---------- Historique des changements d'étape ----------
 
 def test_pipeline_move_is_recorded(thomas):
-    database.set_prospect_stage(thomas, "En contact")
-    database.set_prospect_stage(thomas, "En contact")      # même étape : pas d'entrée
-    database.set_prospect_stage(thomas, "Intéressé")
+    database.set_prospect_stage(thomas, "In contact")
+    database.set_prospect_stage(thomas, "In contact")      # même étape : pas d'entrée
+    database.set_prospect_stage(thomas, "Interested")
 
     changes = database.get_stage_changes(thomas)
 
     assert [(c["from_stage"], c["to_stage"], c["source"]) for c in changes] == [
-        ("En contact", "Intéressé", "pipeline"),
-        ("A prospecter", "En contact", "pipeline"),
+        ("In contact", "Interested", "pipeline"),
+        ("To prospect", "In contact", "pipeline"),
     ]
     assert changes[0]["changed_at_local"]
 
 
 def test_unknown_stage_or_prospect_records_nothing(thomas):
     assert not database.set_prospect_stage(thomas, "Inventée")[0]
-    assert not database.set_prospect_stage(9999, "En contact")[0]
+    assert not database.set_prospect_stage(9999, "In contact")[0]
     assert database.get_stage_changes(thomas) == []
 
 
 def test_edit_form_change_is_recorded(thomas):
-    database.update_prospect(thomas, "Thomas", "Martins", "AlphaEngine", "SaaS", None, None, None, "A relancer")
-    database.update_prospect(thomas, "Thomas", "Martins", "AlphaEngine", "SaaS", None, None, "CEO", "A relancer")
+    database.update_prospect(thomas, "Thomas", "Martins", "AlphaEngine", "SaaS", None, None, None, "To follow up")
+    database.update_prospect(thomas, "Thomas", "Martins", "AlphaEngine", "SaaS", None, None, "CEO", "To follow up")
 
     changes = database.get_stage_changes(thomas)
     assert [(c["from_stage"], c["to_stage"], c["source"]) for c in changes] == [
-        ("A prospecter", "A relancer", "edit"),
+        ("To prospect", "To follow up", "edit"),
     ]
 
 
 def test_deleting_a_stage_records_the_move(thomas):
-    database.delete_stage(stage_id("A prospecter"), move_to="En contact")
+    database.delete_stage(stage_id("To prospect"), move_to="In contact")
 
     change = database.get_stage_changes(thomas)[0]
     assert (change["from_stage"], change["to_stage"], change["source"]) == (
-        "A prospecter", "En contact", "stage deleted")
+        "To prospect", "In contact", "stage deleted")
 
 
 def test_history_is_deleted_with_the_prospect(thomas):
-    database.set_prospect_stage(thomas, "En contact")
+    database.set_prospect_stage(thomas, "In contact")
     deleted = database.delete_prospect(thomas)
 
     assert deleted["stage_changes"] == 1
@@ -70,15 +70,15 @@ def test_build_timeline_merges_and_sorts():
     tasks = [{"created_at_local": "2026-11-10 10:05:00", "title": "Send proposal", "description": "",
               "due_at": "2026-11-13", "status": "A faire"}]
     objections = [{"occurred_at_local": "2026-11-10 10:01:00", "category": "No budget", "verbatim": "Pas avant mars",
-                   "status": "Open", "stage": "En contact", "source": "manual"}]
+                   "status": "Open", "stage": "In contact", "source": "manual"}]
     scores = [{"calculated_at_local": "2026-11-01 09:00:00", "global_score": 0, "fit_score": None,
                "engagement_score": 0, "intent_score": 0},
               {"calculated_at_local": "2026-11-02 09:00:00", "global_score": 0, "fit_score": None,
                "engagement_score": 0, "intent_score": 0},                       # pas de variation : ignoré
               {"calculated_at_local": "2026-11-12 09:05:00", "global_score": 34, "fit_score": None,
                "engagement_score": 40, "intent_score": 25}]
-    stages = [{"changed_at_local": "2026-11-11 08:00:00", "from_stage": "A prospecter",
-               "to_stage": "En contact", "source": "pipeline"}]
+    stages = [{"changed_at_local": "2026-11-11 08:00:00", "from_stage": "To prospect",
+               "to_stage": "In contact", "source": "pipeline"}]
 
     events = build_timeline(prospect, interactions, tasks, objections, scores, stages,
                             format_duration=lambda m: "5 min" if m.get("duration_seconds") else "")
@@ -86,7 +86,7 @@ def test_build_timeline_merges_and_sorts():
     assert [e["title"] for e in events] == [
         "Score 0 → 34",
         "Email in · Completed",
-        "Stage · A prospecter → En contact",
+        "Stage · To prospect → In contact",
         "Follow-up scheduled · Send proposal",
         "Objection · No budget",
         "Call out · Completed",
@@ -114,7 +114,7 @@ def test_timeline_from_real_records(thomas):
                              occurred_at="2026-11-10 10:00:00")
     database.create_task(thomas, "Rappeler", "", "2026-11-20")
     objection_service.record_objection(thomas, "Bad timing")
-    database.set_prospect_stage(thomas, "En contact")
+    database.set_prospect_stage(thomas, "In contact")
 
     events = build_timeline(
         database.get_prospect_by_id(thomas), database.get_interactions(thomas), database.get_tasks(thomas),

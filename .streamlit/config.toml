@@ -16,11 +16,11 @@ borderColor = "#262633"              # bordure discrète
 showWidgetBorder = true
 dataframeBorderColor = "#262633"
 dataframeHeaderBackgroundColor = "#1A1A24"
-dataframeHeaderTextColor = "#9CA3AF"
+dataframeHeaderTextColor = "#9295A1"
 
 # Couleurs sémantiques (réservées aux états : succès, attention, erreur, information)
 violetColor = "#A78BFA"
-grayColor = "#6B7280"
+grayColor = "#9295A1"                # texte secondaire lisible (cahier des charges)
 
 # Typographie : Inter (Regular texte, Medium labels, SemiBold titres et KPI)
 # Chargée depuis Google Fonts par le navigateur.
@@ -35,7 +35,7 @@ baseRadius = "8px"
 buttonRadius = "8px"
 
 # Graphiques : violet / lavande d'abord, puis neutres
-chartCategoricalColors = ["#A78BFA", "#7C3AED", "#6B7280", "#C4B5FD", "#4C1D95", "#9CA3AF"]
+chartCategoricalColors = ["#A78BFA", "#7C3AED", "#9295A1", "#C4B5FD", "#4C1D95", "#6B7280"]
 
 [theme.sidebar]
 backgroundColor = "#0F0F18"

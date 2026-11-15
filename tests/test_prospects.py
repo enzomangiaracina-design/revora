@@ -13,7 +13,7 @@ def test_duplicate_email_is_rejected(thomas):
     )
 
     assert ok is False
-    assert "existe" in message
+    assert "already exists" in message
     assert len(database.get_all_prospects()) == 1
 
 
@@ -61,7 +61,7 @@ def make(**overrides):
     data = {
         "first_name": "Marie", "last_name": "Dupont", "company_name": "Exemple SAS",
         "vertical": "SaaS", "email": "marie@example.com", "phone": "0611223344",
-        "job_title": "CEO", "status": "A prospecter", "source": "", "owner": "",
+        "job_title": "CEO", "status": "To prospect", "source": "", "owner": "",
     }
     data.update(overrides)
     return data
@@ -72,11 +72,11 @@ def test_validate_valid_data():
 
 
 @pytest.mark.parametrize("overrides, expected", [
-    ({"first_name": " "}, "prénom"),
-    ({"company_name": ""}, "entreprise"),
-    ({"email": "pas-un-email"}, "Email invalide"),
-    ({"phone": "12"}, "Téléphone invalide"),
-    ({"status": "Inventé"}, "Statut inconnu"),
+    ({"first_name": " "}, "First name"),
+    ({"company_name": ""}, "Company"),
+    ({"email": "pas-un-email"}, "Invalid email"),
+    ({"phone": "12"}, "Invalid phone"),
+    ({"status": "Inventé"}, "Unknown stage"),
 ])
 def test_validate_errors(overrides, expected):
     errors = service.validate_prospect(make(**overrides))
@@ -90,7 +90,7 @@ def test_service_create_and_name_duplicate(temp_db):
     # Pas d'email, mais même nom + entreprise (casse différente) : doublon
     ok, message = service.create_prospect(make(email="", first_name="MARIE", company_name="exemple sas"))
     assert not ok
-    assert "Doublon" in message
+    assert "Duplicate" in message
     assert len(database.get_all_prospects()) == 1
 
 
@@ -106,20 +106,20 @@ def test_same_phone_is_not_a_duplicate(temp_db):
 def test_service_update_keeps_own_email(thomas):
     ok, _ = service.update_prospect(thomas, make(
         first_name="Thomas", last_name="Martins", company_name="AlphaEngine",
-        email="thomas.martin@example.com", status="Intéressé",
+        email="thomas.martin@example.com", status="Interested",
     ))
 
     assert ok
-    assert database.get_prospect_by_id(thomas)["status"] == "Intéressé"
+    assert database.get_prospect_by_id(thomas)["status"] == "Interested"
 
 
 PROSPECTS = [
     {"id": 1, "first_name": "Thomas", "last_name": "Martins", "company_name": "AlphaEngine",
      "email": "thomas@alpha.io", "phone": "06 12 34 56 78", "job_title": "Head of Sales",
-     "vertical": "SaaS", "status": "A prospecter", "source": "HubSpot"},
+     "vertical": "SaaS", "status": "To prospect", "source": "HubSpot"},
     {"id": 2, "first_name": "Julie", "last_name": "Durand", "company_name": "BankCo",
      "email": "julie@bank.fr", "phone": None, "job_title": "CFO",
-     "vertical": "Finance", "status": "Intéressé", "source": None},
+     "vertical": "Finance", "status": "Interested", "source": None},
 ]
 
 
@@ -130,7 +130,7 @@ PROSPECTS = [
     ({"query": "0612345678"}, [1]),
     ({"query": "cfo"}, [2]),
     ({"verticals": ["Finance"]}, [2]),
-    ({"statuses": ["A prospecter"]}, [1]),
+    ({"statuses": ["To prospect"]}, [1]),
     ({"sources": ["HubSpot"]}, [1]),
     ({"query": "julie", "verticals": ["SaaS"]}, []),
 ])
@@ -185,7 +185,7 @@ def test_import_report(thomas):
 
     marie = [p for p in database.get_all_prospects() if p["first_name"] == "Marie"][0]
     assert marie["source"] == "Test"
-    assert marie["status"] == "A prospecter"
+    assert marie["status"] == "To prospect"
 
 
 def test_company_match_ignores_accented_case(temp_db):

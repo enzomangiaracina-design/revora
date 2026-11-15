@@ -61,7 +61,7 @@ def interaction(day, channel="Call", direction="Outbound", event_type="Completed
     }
 
 
-PROSPECT = {"vertical": "SaaS", "job_title": "Head of Sales", "status": "En contact"}
+PROSPECT = {"vertical": "SaaS", "job_title": "Head of Sales", "status": "In contact"}
 ICP = {"icp": {"verticals": ["SaaS"], "title_keywords": ["sales", "ceo"]}}
 
 
@@ -147,7 +147,7 @@ def test_intent_confirmed_and_observed():
 
 
 def test_intent_is_zero_in_closed_stage():
-    prospect = {**PROSPECT, "status": "Disqualifié", "budget_confirmed": 1}
+    prospect = {**PROSPECT, "status": "Disqualified", "budget_confirmed": 1}
 
     score, explanation = scoring.compute_intent(prospect, [], scoring.merge_config(), TODAY, stage_closed=True)
 
@@ -173,7 +173,7 @@ def test_compute_scores_and_temperature():
 @pytest.mark.parametrize("config, expected", [
     ({"weights": {"fit": 0.5, "engagement": 0.5, "intent": 0.5}}, "100 %"),
     ({"thresholds": {"hot": 40, "warm": 50}}, "Warm < Hot"),
-    ({"half_life_days": 0}, "demi-vie"),
+    ({"half_life_days": 0}, "half-life"),
 ])
 def test_validate_config(config, expected):
     errors = scoring.validate_config(scoring.merge_config(config))
@@ -223,5 +223,5 @@ def test_calibration_by_stage(thomas):
     )
 
     first = rows[0]
-    assert first["Stage"] == "A prospecter" and first["Prospects"] == 1
+    assert first["Stage"] == "To prospect" and first["Prospects"] == 1
     assert rows[1]["Average score"] is None
