@@ -25,7 +25,11 @@
 
 ## Architecture
 - Identité visuelle : couleurs, police et rayons dans `.streamlit/config.toml` ; jetons et CSS complémentaire dans `ui/theme.py`. Ne jamais ajouter de couleur, rayon, effet ou style d'icône ailleurs (règle du brand kit). Le violet est réservé aux actions, à la navigation active et à la sélection ; vert/orange/rouge/bleu aux états.
-- `database.py` : toute la logique SQL. `main.py` n'exécute jamais de SQL directement.
+- `database.py` : toute la logique SQL. L'interface (`main.py`, `screens/`) n'exécute jamais de SQL directement.
+- `main.py` : configuration, données communes (`AppContext`), navigation et aiguillage — rien d'autre.
+- `screens/` : une page = un module avec `render(ctx)` ; outils d'interface communs dans `screens/shared.py`,
+  imports communs dans `screens/common.py`. Modifier une page = modifier son module, sans toucher aux autres.
+- Ne pas créer de dossier `pages/` : Streamlit le transforme automatiquement en navigation multipage.
 - `DATABASE_PATH` est relatif à `database.py` (pas au dossier courant).
 - Interactions : `UNIQUE(provider, external_id)` garantit l'idempotence des synchronisations futures ; les saisies manuelles utilisent `provider = 'manual'`.
 - Les futurs connecteurs suivront l'interface `authenticate / test_connection / fetch_events / normalize_event / sync_events`, découplés du scoring.

@@ -1,5 +1,26 @@
 # CHANGELOG — REVORA
 
+## [0.14.1] — 2026-11-15 — P0.1 : découpage de l'interface en pages
+
+Première étape de P0 (blueprint Produit & UX). **Aucun changement de comportement.**
+
+### Modifié
+- `main.py` (2 251 lignes) découpé : il ne garde que la configuration, les données communes, la navigation
+  et l'appel de la page (90 lignes).
+- `screens/` : un module par page avec `render(ctx)` ; `shared.py` (formulaires, cartes, navigation entre
+  pages, fenêtre d'ajout) ; `common.py` (imports communs) ; `AppContext` (prospects, étapes, scores).
+- Le découpage a été fait par un **script** qui recopie chaque bloc de page sans le modifier. Seule
+  adaptation : le formulaire prospect lit la liste des étapes via `get_stage_names()` au lieu d'une
+  variable globale (même valeur).
+
+### Vérifications
+- **Relevé de toutes les pages** (356 éléments affichés, dans l'ordre) sur une base fictive identique :
+  relevé stable (deux passes identiques), puis **identique avant et après** le découpage.
+- Interactions entre modules : ouverture d'une fiche depuis l'Overview, création d'un prospect,
+  saisie d'une interaction, relance terminée — toutes fonctionnelles.
+- `python3 -m pytest` : 228 tests réussis ; navigateur : Overview et Pipeline (Kanban) affichés.
+- Sauvegarde préalable : `backups/20261115-081759/`. Aucune migration de base.
+
 ## [0.14.0] — 2026-11-15 — Phase 9 : LinkedIn (saisie manuelle, conforme)
 
 REVORA **ne se connecte pas à LinkedIn** : aucune API ouverte ne donne accès aux relations, messages ou

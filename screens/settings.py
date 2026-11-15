@@ -1,0 +1,200 @@
+"""Page « Settings »."""
+
+from screens.common import *  # noqa: F401,F403
+from screens.shared import *  # noqa: F401,F403
+
+
+def render(ctx):
+    """Affiche la page « Settings »."""
+
+    prospects, stage_names, scores = ctx.prospects, ctx.stage_names, ctx.scores
+
+
+    st.title("Settings")
+    st.caption("Scoring configuration. All values are provisional and should be calibrated.")
+
+    show_flash_message()
+
+    config = load_config()
+
+    with st.form("scoring_settings_form"):
+
+        st.subheader("Target profile (Fit score)")
+        st.caption(
+            "Leave a criterion empty to ignore it. With no criterion, Fit is not evaluated "
+            "and the global score uses Engagement and Intent only."
+        )
+
+        col1, col2 = st.columns(2)
+
+        target_verticals = col1.multiselect(
+            "Target verticals",
+            sorted(set(get_verticals()) | set(config["icp"]["verticals"])),
+            default=config["icp"]["verticals"],
+            accept_new_options=True
+        )
+        title_keywords = col2.text_input(
+            "Target job title keywords (comma separated)",
+            value=", ".join(config["icp"]["title_keywords"]),
+            placeholder="Example: sales, ceo, head, vp"
+        )
+
+        st.subheader("Weights (%)")
+
+        col1, col2, col3 = st.columns(3)
+
+        weight_fit = col1.number_input("Fit", 0, 100, round(config["weights"]["fit"] * 100))
+        weight_engagement = col2.number_input(
+            "Engagement", 0, 100, round(config["weights"]["engagement"] * 100)
+        )
+        weight_intent = col3.number_input("Intent", 0, 100, round(config["weights"]["intent"] * 100))
+
+        st.subheader("Thresholds and freshness")
+
+        col1, col2, col3 = st.columns(3)
+
+        hot = col1.number_input("Hot from", 1, 100, config["thresholds"]["hot"])
+        warm = col2.number_input("Warm from", 1, 100, config["thresholds"]["warm"])
+        half_life = col3.number_input(
+            "Signal half-life (days)", 1, 365, config["half_life_days"],
+            help="A signal this old counts for half its points; twice as old, a quarter."
+        )
+
+        col_save, col_reset = st.columns(2)
+
+        submitted = col_save.form_submit_button("Save and recompute", type="primary", width="stretch")
+        reset = col_reset.form_submit_button("Restore defaults", width="stretch")
+
+    if submitted or reset:
+
+        if reset:
+            new_config = DEFAULT_CONFIG
+        else:
+            new_config = {
+                "icp": {
+                    "verticals": target_verticals,
+                    "title_keywords": [k.strip() for k in title_keywords.split(",") if k.strip()],
+                },
+                "weights": {
+                    "fit": weight_fit / 100,
+                    "engagement": weight_engagement / 100,
+                    "intent": weight_intent / 100,
+                },
+                "thresholds": {"hot": hot, "warm": warm},
+                "half_life_days": half_life,
+            }
+
+        ok, message = save_config(new_config)
+
+        if ok:
+            st.session_state["flash"] = message
+            st.rerun()
+        else:
+            st.error(message)
+
+    st.divider()
+
+    st.subheader("Calibration")
+    st.caption(
+        "Average score per pipeline stage. Advanced stages (meetings…) should score higher "
+        "than early ones; if not, adjust the target profile or the weights. "
+        "Reliable calibration needs real conversions over time."
+    )
+
+    st.dataframe(
+        pd.DataFrame(calibration_by_stage(prospects, scores, get_stages())),
+        width="stretch",
+        hide_index=True
+    )
+
+    with st.expander("Scoring rules (points)"):
+        st.markdown(
+            "- **Engagement** (observed, decayed by freshness, capped per type): "
+            "email reply 20 (max 40), inbound call 25 (max 50), LinkedIn reply 15 (max 30), "
+            "LinkedIn connection accepted 10 (max 10), "
+            "phone conversation 15 (max 45), positive response +20 (max 40). "
+            "Outbound attempts without reaction: 0 by design.\n"
+            "- **Intent**: need identified 25, decision maker 15, budget confirmed 30, "
+            "demo requested 30 (confirmed by you), meeting booked 35 (observed, decayed). "
+            "Closed stage: 0.\n"
+            "- **Fit**: target vertical 50, target job title 50 (only configured criteria count)."
+        )
+
+    # ---------- INTEGRATIONS ----------
+
+    st.divider()
+    st.subheader("Integrations")
+    st.caption(
+        "Nothing is connected by default. Use TEST accounts only, and set the access tokens "
+        "in the .env file (never in the code). Buttons stay disabled until a token is detected. "
+        "See docs/INTEGRATIONS.md."
+    )
+
+    integration_states = get_integrations()
+
+    for provider, label, secret, connector_class in [
+        ("hubspot", "HubSpot", "HUBSPOT_ACCESS_TOKEN", HubSpotConnector),
+        ("gmail", "Gmail", "GMAIL_ACCESS_TOKEN", GmailConnector),
+    ]:
+        state = integration_states.get(provider, {})
+        has_token = get_secret(secret) is not None
+
+        with st.container(border=True):
+
+            col_name, col_state, col_actions = st.columns([1.5, 2.5, 2], vertical_alignment="center")
+
+            col_name.markdown(f"**{label}**")
+            col_name.caption(state.get("status") or "Not connected")
+
+            col_state.caption(f"Token ({secret}): {'detected' if has_token else 'not set'}")
+            col_state.caption(f"Last sync: {state.get('last_sync_at') or 'never'}")
+
+            if state.get("last_error"):
+                col_state.caption(f":red[{state['last_error']}]")
+
+            if col_actions.button(
+                "Sync now", key=f"sync_{provider}", disabled=not has_token, width="stretch"
+            ):
+                result = run_sync(connector_class())
+                st.session_state["flash"] = (
+                    f"{label}: {result['status']} — {result['created']} created, "
+                    f"{result['duplicates']} duplicate(s), {result['unmatched']} unmatched"
+                    + (f" — {result['message']}" if result.get("message") else "")
+                )
+                st.rerun()
+
+            if provider == "hubspot" and col_actions.button(
+                "Import contacts", key="import_hubspot", disabled=not has_token, width="stretch"
+            ):
+                try:
+                    report = import_hubspot_contacts(HubSpotConnector())
+                    st.session_state["flash"] = (
+                        f"HubSpot contacts: {report['created']} created, {report['linked']} linked, "
+                        f"{report['already_linked']} already linked, {len(report['errors'])} rejected"
+                    )
+                except Exception as error:  # message affiché, jamais de plantage de la page
+                    st.session_state["flash"] = f"HubSpot import failed: {error}"
+                st.rerun()
+
+    logs = get_sync_logs()
+
+    if logs:
+        with st.expander(f"Sync log ({len(logs)})"):
+            st.dataframe(
+                pd.DataFrame([
+                    {
+                        "Date": log["started_at_local"],
+                        "Provider": log["provider"],
+                        "Status": log["status"],
+                        "Fetched": log["fetched"],
+                        "Created": log["created"],
+                        "Duplicates": log["duplicates"],
+                        "Unmatched": log["unmatched"],
+                        "Errors": log["errors"],
+                        "Message": log["message"],
+                    }
+                    for log in logs
+                ]),
+                width="stretch",
+                hide_index=True
+            )

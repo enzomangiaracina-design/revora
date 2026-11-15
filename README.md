@@ -6,7 +6,7 @@ REVORA est un espace de travail de prospection pour SDR/BDR : il mémorise les
 interactions (appels, emails, notes), organise le portefeuille de prospects et
 aide à décider quelle action effectuer ensuite.
 
-Statut : **prototype local** (Streamlit + SQLite), version 0.14.0.
+Statut : **prototype local** (Streamlit + SQLite), version 0.14.1.
 
 ## Lancer l'application
 
@@ -49,7 +49,8 @@ Les tests utilisent une base temporaire : ils ne touchent jamais `revora.db`.
 
 | Fichier | Rôle |
 |---|---|
-| `main.py` | Interface Streamlit (navigation, pages, formulaires) |
+| `main.py` | Point d'entrée : configuration, données communes, navigation, appel de la page choisie |
+| `screens/` | Une page par module (`overview.py`, `prospects.py`, `prospect_details.py`, `pipeline.py`, `activity.py`, `objections.py`, `copilot.py`, `performance.py`, `settings.py`) ; `shared.py` : formulaires et composants communs ; `common.py` : imports communs |
 | `database.py` | Accès à la base SQLite : création des tables et toutes les fonctions de lecture/écriture |
 | `revora.db` | Base SQLite locale. **Ne jamais la supprimer.** |
 | `backups/` | Copies horodatées des fichiers et de la base, faites avant chaque modification importante |
