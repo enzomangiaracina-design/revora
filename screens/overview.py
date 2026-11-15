@@ -66,10 +66,17 @@ def render(ctx):
     if col_add.button("Add prospect", type="primary", icon=":material/person_add:", width="stretch"):
         add_prospect_dialog()
 
+    # Phase 11.2 : « My prospects » limite toute la page aux prospects de l'utilisateur actif
+    prospects, mine = scope_prospects(ctx, st, "overview")
+
+    if mine:
+        all_interactions = for_prospects(all_interactions, prospects)
+        all_objections = for_prospects(all_objections, prospects)
+
     show_flash_message()
 
     if search.strip():
-        results = filter_prospects(prospects, search)[:5]
+        results = filter_prospects(ctx.prospects, search)[:5]     # la recherche couvre toute la base
 
         with st.container(border=True):
             if not results:
@@ -82,7 +89,15 @@ def render(ctx):
                 col_open.button("Open", key=f"search_open_{p['id']}", on_click=open_prospect,
                                 args=(p["id"],), width="stretch")
 
-    if not prospects:
+    if mine and not prospects and ctx.prospects:
+        empty_state(
+            "No prospect assigned to you yet",
+            f"Prospects whose sales owner is {ctx.user['name']} appear here. Assign some, or show everyone's.",
+            [{"label": "Show everyone", "icon": ":material/groups:", "on_click": show_everyone}],
+            icon=":material/person_search:", key="overview_mine_empty",
+        )
+
+    if not ctx.prospects:
         empty_state(
             "Your prospect database is empty",
             "Add a first prospect or import a CSV file: priorities and activity will appear here.",
@@ -95,7 +110,8 @@ def render(ctx):
     yesterday = today - timedelta(days=1)
     yesterday_kpis = compute_kpis(all_interactions, all_objections, yesterday, yesterday)
 
-    task_groups = group_tasks(get_all_tasks(), today)
+    all_tasks = get_all_tasks()
+    task_groups = group_tasks(for_prospects(all_tasks, prospects) if mine else all_tasks, today)
     stale_days = st.session_state.get("stale_days", DEFAULT_STALE_DAYS)
     ranked_all = prioritize(
         prospects, stages, summaries, stale_days,
@@ -233,8 +249,10 @@ def render(ctx):
         theme.section_title("Recent activity")
 
         feed = build_feed(
-            all_interactions, all_objections, prospects, get_recent_score_changes(), limit=8,
-            stage_changes=get_recent_stage_changes(),
+            all_interactions, all_objections, prospects,
+            for_prospects(get_recent_score_changes(), prospects) if mine else get_recent_score_changes(),
+            limit=8,
+            stage_changes=for_prospects(get_recent_stage_changes(), prospects) if mine else get_recent_stage_changes(),
         )
 
         if not feed:

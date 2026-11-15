@@ -122,7 +122,7 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 ## Phase 11 — Multi-utilisateur 🟡
 - ✅ 11.1 Équipe (rôles SDR / Manager, actif / inactif), menu « Signed in as », propriétaire choisi
   dans l'équipe (v0.32.0) — sans mot de passe pour l'instant
-- ⬜ 11.2 « Mes prospects » : Today's focus, liste et pipeline limités à l'utilisateur actif
+- ✅ 11.2 « My prospects » : Overview, liste et pipeline limités à l'utilisateur actif (v0.33.0)
 - ⬜ 11.3 Vues manager / équipe dans Performance
 - ⬜ Vraie connexion (identifiants) : avec l'hébergement, phase 12
 ## Phase 12 — Production (PostgreSQL, hébergement, sécurité, monitoring) ⬜

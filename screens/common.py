@@ -197,4 +197,9 @@ from core.user_service import (
     import_owners,
     owner_choices,
     find_user,
+    MINE,
+    EVERYONE,
+    default_scope,
+    owned_by,
+    for_prospects,
 )

@@ -32,6 +32,9 @@ def render(ctx):
 
     if view != "Stages":
 
+        # Phase 11.2 : « My prospects » (affiché si quelqu'un est choisi dans « Signed in as »)
+        scope, _ = scope_prospects(ctx, st, "pipeline")
+
         # ---------- BARRE D'OUTILS : recherche, filtres, tri ----------
 
         col_search, col_filter, col_sort = st.columns([3, 1, 2], vertical_alignment="bottom")
@@ -82,7 +85,7 @@ def render(ctx):
 
         # ---------- APPLICATION DES FILTRES ET DU TRI ----------
 
-        filtered = filter_prospects(prospects, query, selected_verticals, None, None, selected_owners)
+        filtered = filter_prospects(scope, query, selected_verticals, None, None, selected_owners)
         filtered = filter_quick(
             filtered, summaries, created_filter, activity_filter, follow_up_filter, stale_days
         )

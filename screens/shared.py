@@ -80,6 +80,50 @@ def _remember_user():
         st.query_params[USER_KEY] = str(chosen)
 
 
+# ---------- « Mes prospects » (phase 11.2) ----------
+
+SCOPE_KEY = "scope"          # choix partagé par l'Overview, la liste Prospects et le Pipeline
+SCOPE_OWNER_KEY = "_scope_user"
+
+
+def _sync_scope(widget_key):
+    st.session_state[SCOPE_KEY] = st.session_state[widget_key]
+
+
+def scope_prospects(ctx, container, key):
+    """Bouton « My prospects / Everyone ». Retourne (prospects visibles, True si « mes prospects »).
+
+    Affiché seulement si quelqu'un est choisi dans « Signed in as ». Le choix est
+    partagé entre les pages ; il revient au défaut du rôle quand on change d'utilisateur.
+    """
+
+    if not ctx.user:
+        return ctx.prospects, False
+
+    if st.session_state.get(SCOPE_OWNER_KEY) != ctx.user["id"]:
+        st.session_state[SCOPE_KEY] = default_scope(ctx.user)
+        st.session_state[SCOPE_OWNER_KEY] = ctx.user["id"]
+
+    widget_key = f"{key}_scope"
+    st.session_state[widget_key] = st.session_state[SCOPE_KEY]     # même choix sur toutes les pages
+    container.segmented_control(
+        "Show", [MINE, EVERYONE], key=widget_key, required=True, label_visibility="collapsed",
+        on_change=_sync_scope, args=(widget_key,),
+        help=f"My prospects: those whose sales owner is {ctx.user['name']}.",
+    )
+
+    if st.session_state[SCOPE_KEY] == MINE:
+        return owned_by(ctx.prospects, ctx.user["name"]), True
+
+    return ctx.prospects, False
+
+
+def show_everyone():
+    """Callback : repasse la vue sur « Everyone »."""
+
+    st.session_state[SCOPE_KEY] = EVERYONE
+
+
 def current_user_name():
     """Nom de l'utilisateur choisi dans « Signed in as », ou None."""
 

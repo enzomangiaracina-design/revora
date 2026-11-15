@@ -1,5 +1,23 @@
 # CHANGELOG — REVORA
 
+## [0.33.0] — 2026-11-15 — Phase 11.2 : « My prospects »
+
+### Ajouté
+- Bouton **« My prospects / Everyone »** sur l'Overview, la liste Prospects et le Pipeline, affiché dès
+  que quelqu'un est choisi dans « Signed in as ».
+  - « My prospects » = prospects dont le Sales owner est l'utilisateur actif.
+  - Par défaut : un **SDR** voit ses prospects, un **Manager** voit tout le monde.
+  - Le choix est **partagé** entre les trois pages ; il revient au défaut quand on change d'utilisateur.
+- Overview en « My prospects » : Today's focus, indicateurs du jour, relances, activité récente et
+  « Last 7 days » limités à ses prospects. La recherche couvre toujours toute la base.
+  Si aucun prospect ne lui est assigné : état vide avec le bouton « Show everyone ».
+- `user_service.default_scope / owned_by / for_prospects`, `shared.scope_prospects`.
+
+### Tests
+- 373 tests (4 nouveaux). Vérifié dans le navigateur sur une copie de `demo.db` : Léa (SDR) voit
+  6 prospects sur 20 et 2 relances au lieu de 9 ; « Everyone » suit d'une page à l'autre.
+  Bouton déplacé sur sa propre ligne (il était coupé dans l'en-tête de l'Overview et du Pipeline).
+
 ## [0.32.0] — 2026-11-15 — Phase 11.1 : équipe et utilisateur actif
 
 ### Ajouté

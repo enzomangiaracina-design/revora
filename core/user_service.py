@@ -108,3 +108,33 @@ def find_user(users, name):
     name = (name or "").casefold()
 
     return next((u for u in users if u["name"].casefold() == name), None)
+
+
+# ==========================================
+# « MES PROSPECTS » (phase 11.2)
+# ==========================================
+
+MINE = "My prospects"
+EVERYONE = "Everyone"
+
+
+def default_scope(user):
+    """Vue par défaut : un SDR voit ses prospects, un manager (ou personne) voit tout."""
+
+    return MINE if user and user.get("role") == "SDR" else EVERYONE
+
+
+def owned_by(prospects, name):
+    """Prospects dont le propriétaire est `name` (sans tenir compte des majuscules ni des espaces)."""
+
+    name = (name or "").strip().casefold()
+
+    return [p for p in prospects if name and (p.get("owner") or "").strip().casefold() == name]
+
+
+def for_prospects(items, prospects, key="contact_id"):
+    """Garde les éléments (interactions, relances, objections…) qui concernent ces prospects."""
+
+    ids = {p["id"] for p in prospects}
+
+    return [item for item in items if item.get(key) in ids]

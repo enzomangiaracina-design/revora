@@ -41,6 +41,8 @@ def render(ctx):
             )
 
         else:
+            scope, _ = scope_prospects(ctx, st, "prospects")       # Phase 11.2 : « My prospects »
+
             col_search, col_vertical, col_status, col_source, col_owner = st.columns(
                 [2, 1, 1, 1, 1]
             )
@@ -58,11 +60,12 @@ def render(ctx):
             )
 
             filtered = filter_prospects(
-                prospects, query, selected_verticals, selected_statuses,
+                scope, query, selected_verticals, selected_statuses,
                 selected_sources, selected_owners
             )
 
-            st.caption(f"{len(filtered)} of {len(prospects)} prospects")
+            st.caption(f"{len(filtered)} of {len(prospects)} prospects"
+                       + (" · showing your prospects only" if len(scope) < len(prospects) else ""))
 
             if filtered:
                 df = pd.DataFrame(filtered)
