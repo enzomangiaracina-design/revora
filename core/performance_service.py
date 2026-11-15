@@ -22,6 +22,10 @@ Définitions :
   - Délai moyen de relance : nombre moyen de jours entre deux prises de contact
                             sortantes successives auprès du même prospect
                             (la seconde ayant lieu pendant la période).
+  - Invitations LinkedIn  : demandes de connexion envoyées pendant la période.
+  - Taux d'acceptation    : prospects invités pendant la période qui ont accepté
+                            ensuite (pendant la période) / prospects invités.
+  Une invitation acceptée n'est PAS comptée comme une réponse.
 """
 
 from collections import defaultdict
@@ -133,6 +137,7 @@ def compute_kpis(all_interactions, objections, start, end):
     replied = {
         i["contact_id"] for i in period
         if i["direction"] == "Inbound" and i["channel"] in REACTION_CHANNELS
+        and i["event_type"] != "Connection accepted"
         and i["contact_id"] in first_touch and i["occurred_at_local"] > first_touch[i["contact_id"]]
     }
 
@@ -141,6 +146,17 @@ def compute_kpis(all_interactions, objections, start, end):
 
     days = working_days(start, end)
     period_objections = in_range(objections, start, end)
+
+    first_request = {}
+    for item in sorted(period, key=lambda i: i["occurred_at_local"]):
+        if item["channel"] == "LinkedIn" and item["event_type"] == "Connection request sent":
+            first_request.setdefault(item["contact_id"], item["occurred_at_local"])
+
+    accepted = {
+        i["contact_id"] for i in period
+        if i["channel"] == "LinkedIn" and i["event_type"] == "Connection accepted"
+        and i["contact_id"] in first_request and i["occurred_at_local"] > first_request[i["contact_id"]]
+    }
 
     return {
         "calls": len(calls),
@@ -156,6 +172,16 @@ def compute_kpis(all_interactions, objections, start, end):
         "conversion_rate": _ratio(len(converted), len(first_touch)),
         "objections": len(period_objections),
         "follow_up_delay": follow_up_delay(all_interactions, start, end),
+        "linkedin_requests": sum(
+            1 for i in period
+            if i["channel"] == "LinkedIn" and i["event_type"] == "Connection request sent"
+        ),
+        "linkedin_acceptance_rate": _ratio(len(accepted), len(first_request)),
+        "linkedin_messages": sum(
+            1 for i in period
+            if i["channel"] == "LinkedIn" and i["direction"] == "Outbound"
+            and i["event_type"] not in ("Connection request sent",)
+        ),
         "working_days": days,
     }
 

@@ -28,6 +28,17 @@ RESULTS = [
     "Other",
 ]
 
+# Actions propres à LinkedIn (saisies à la main : aucune automatisation, aucun
+# accès à LinkedIn — interdit par ses conditions d'utilisation).
+# Le sens est fixé par la nature de l'action.
+LINKEDIN_RESULTS = {
+    "Connection request sent": "Outbound",
+    "Connection accepted": "Inbound",   # c'est le prospect qui agit
+    "InMail sent": "Outbound",
+}
+
+RESULTS = RESULTS[:-1] + list(LINKEDIN_RESULTS) + ["Other"]
+
 TASK_OPEN = "A faire"
 TASK_DONE = "Terminee"
 
@@ -60,6 +71,17 @@ def log_interaction(contact_id, data, now=None):
     if data.get("channel") not in CHANNELS:
         return False, "Type d'interaction inconnu."
 
+    event_type = data.get("event_type") or "Other"
+    direction = data.get("direction")
+
+    if event_type in LINKEDIN_RESULTS:
+        if data["channel"] != "LinkedIn":
+            return False, f"« {event_type} » n'existe que pour le type LinkedIn."
+
+        direction = LINKEDIN_RESULTS[event_type]
+        # Une action LinkedIn se suffit à elle-même : l'objet est facultatif
+        subject = subject or event_type
+
     if not subject and not content:
         return False, "Saisissez un objet ou une note."
 
@@ -79,8 +101,8 @@ def log_interaction(contact_id, data, now=None):
     interaction_id = database.add_interaction(
         contact_id,
         data["channel"],
-        data.get("direction"),
-        data.get("event_type") or "Other",
+        direction,
+        event_type,
         subject,
         content,
         outcome,

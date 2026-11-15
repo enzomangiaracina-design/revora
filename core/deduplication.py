@@ -48,3 +48,30 @@ def normalize_phone(phone):
         return cleaned
 
     return None
+
+
+LINKEDIN_PROFILE = re.compile(
+    # Identifiant limité aux caractères utilisés par LinkedIn (lettres, chiffres, - _ . %) :
+    # l'URL est affichée comme lien, aucun caractère ne doit pouvoir le détourner.
+    r"^(?:https?://)?(?:[a-z]{2,3}\.|www\.)?linkedin\.com/in/([A-Za-z0-9_.%-]+)/?(?:[?#].*)?$",
+    re.IGNORECASE,
+)
+
+
+def normalize_linkedin_url(url):
+    """URL de profil LinkedIn -> forme unique "https://www.linkedin.com/in/<identifiant>".
+
+    Accepte "linkedin.com/in/x", "fr.linkedin.com/in/x/", "https://www.linkedin.com/in/X?trk=…".
+    Retourne None si ce n'est pas une URL de profil personnel (/in/…).
+    Simple mise en forme du texte saisi : aucune page LinkedIn n'est consultée.
+    """
+
+    if not url or not url.strip():
+        return None
+
+    match = LINKEDIN_PROFILE.match(url.strip())
+
+    if not match:
+        return None
+
+    return f"https://www.linkedin.com/in/{match.group(1).lower()}"

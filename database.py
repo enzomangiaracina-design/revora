@@ -240,6 +240,9 @@ def initialize_database():
 
     _add_column_if_missing(cursor, "scores", "explanation", "TEXT")
 
+    # MIGRATION (phase 9) : URL du profil LinkedIn (saisie par le commercial)
+    _add_column_if_missing(cursor, "contacts", "linkedin_url", "TEXT")
+
     connection.commit()
     connection.close()
 
@@ -299,6 +302,10 @@ def _add_column_if_missing(cursor, table, column, column_type):
 # 3. CREATION DES PROSPECTS
 # ==========================================
 
+# Valeur speciale : "argument non fourni" (different de None, qui veut dire "vide")
+_UNCHANGED = object()
+
+
 def _clean(value):
     """Retire les espaces autour d'un texte ; retourne None si le texte est vide."""
 
@@ -348,12 +355,13 @@ def create_prospect(
     status=None,
     source=None,
     owner=None,
-    hubspot_id=None
+    hubspot_id=None,
+    linkedin_url=None
 ):
     """Cree une entreprise si necessaire et un prospect.
 
-    status, source, owner et hubspot_id sont optionnels : les appels
-    existants (7 arguments) continuent de fonctionner.
+    status, source, owner, hubspot_id et linkedin_url sont optionnels :
+    les appels existants (7 arguments) continuent de fonctionner.
     """
 
     connection = get_connection()
@@ -392,9 +400,10 @@ def create_prospect(
                 status,
                 source,
                 owner,
-                hubspot_id
+                hubspot_id,
+                linkedin_url
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 company_id,
@@ -406,7 +415,8 @@ def create_prospect(
                 _clean(status) or "A prospecter",
                 _clean(source),
                 _clean(owner),
-                _clean(hubspot_id)
+                _clean(hubspot_id),
+                _clean(linkedin_url)
             )
         )
 
@@ -444,6 +454,7 @@ def get_all_prospects():
             contacts.source,
             contacts.owner,
             contacts.hubspot_id,
+            contacts.linkedin_url,
             contacts.created_at,
             datetime(contacts.created_at, 'localtime') AS created_at_local,
             contacts.need_identified,
@@ -530,9 +541,14 @@ def update_prospect(
     job_title,
     status,
     source=None,
-    owner=None
+    owner=None,
+    linkedin_url=_UNCHANGED
 ):
-    """Met a jour un prospect. Retourne (succes, message)."""
+    """Met a jour un prospect. Retourne (succes, message).
+
+    linkedin_url : si l'argument n'est pas fourni, l'URL existante est
+    conservee (les appels plus anciens ne l'effacent pas).
+    """
 
     connection = get_connection()
 
@@ -566,6 +582,7 @@ def update_prospect(
                 status = ?,
                 source = ?,
                 owner = ?,
+                linkedin_url = CASE WHEN ? THEN ? ELSE linkedin_url END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """,
@@ -579,6 +596,8 @@ def update_prospect(
                 _clean(status) or "A prospecter",
                 _clean(source),
                 _clean(owner),
+                int(linkedin_url is not _UNCHANGED),
+                None if linkedin_url is _UNCHANGED else _clean(linkedin_url),
                 contact_id
             )
         )

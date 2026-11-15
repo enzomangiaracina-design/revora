@@ -183,7 +183,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.13.1")
+st.sidebar.caption("VERSION 0.14.0")
 
 
 # ==========================================
@@ -283,9 +283,15 @@ def prospect_form(form_key, verticals, submit_label, defaults=None):
         )
         owner = col2.text_input("Sales owner", value=defaults.get("owner") or "")
 
+        linkedin_url = st.text_input(
+            "LinkedIn profile URL", value=defaults.get("linkedin_url") or "",
+            placeholder="https://www.linkedin.com/in/…  (copied by you — REVORA never visits LinkedIn)"
+        )
+
         submitted = st.form_submit_button(submit_label, width="stretch")
 
     data = {
+        "linkedin_url": linkedin_url,
         "first_name": first_name,
         "last_name": last_name,
         "company_name": company_name,
@@ -322,7 +328,11 @@ def interaction_form(form_key, prospect_options=None):
 
         channel = col1.selectbox("Interaction type", CHANNELS)
         direction = col2.selectbox("Direction", DIRECTIONS)
-        event_type = col3.selectbox("Result", RESULTS)
+        event_type = col3.selectbox(
+            "Result", RESULTS,
+            help="LinkedIn actions (connection request, accepted, InMail) require the LinkedIn type; "
+                 "their direction is set automatically.",
+        )
 
         col1, col2, col3 = st.columns(3)
 
@@ -796,7 +806,7 @@ elif page == "Prospects":
                         "Prospect", "company_name", "vertical", "job_title",
                         "Score", "Temperature",
                         "email", "phone", "status", "Calls", "Emails",
-                        "Last activity", "Next follow-up", "source", "owner"
+                        "Last activity", "Next follow-up", "source", "owner", "linkedin_url"
                     ]].rename(columns={
                         "company_name": "Company",
                         "vertical": "Vertical",
@@ -805,8 +815,12 @@ elif page == "Prospects":
                         "phone": "Phone",
                         "status": "Status",
                         "source": "Source",
-                        "owner": "Owner"
+                        "owner": "Owner",
+                        "linkedin_url": "LinkedIn"
                     }),
+                    column_config={
+                        "LinkedIn": st.column_config.LinkColumn("LinkedIn", display_text="Profile"),
+                    },
                     width="stretch",
                     hide_index=True
                 )
@@ -996,7 +1010,7 @@ elif page == "Prospect Details":
 
             st.subheader("Contact information")
 
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
 
             col1.write("**Email**")
             col1.write(prospect["email"] or "Not provided")
@@ -1004,8 +1018,15 @@ elif page == "Prospect Details":
             col2.write("**Phone**")
             col2.write(prospect["phone"] or "Not provided")
 
-            col3.write("**Status**")
-            col3.write(prospect["status"])
+            col3.write("**LinkedIn**")
+            if prospect.get("linkedin_url"):
+                # Lien ouvert par VOUS dans votre navigateur : REVORA ne consulte pas LinkedIn
+                col3.markdown(f"[Open profile]({prospect['linkedin_url']})")
+            else:
+                col3.write("Not provided")
+
+            col4.write("**Status**")
+            col4.write(prospect["status"])
 
             st.divider()
 
@@ -1988,6 +2009,13 @@ elif page == "Performance":
     kpi(col5, "Days between follow-ups", "follow_up_delay", inverse=True,
         help_text="Average days between two successive outbound touches on the same prospect.")
 
+    st.markdown("**LinkedIn** (recorded manually)")
+    col1, col2, col3, _, _ = st.columns(5)
+    kpi(col1, "Connection requests", "linkedin_requests")
+    kpi(col2, "Acceptance rate", "linkedin_acceptance_rate", " %",
+        help_text="Prospects invited in the period who then accepted / prospects invited.")
+    kpi(col3, "LinkedIn messages sent", "linkedin_messages")
+
     st.caption(
         f"{current['contacted']} prospect(s) contacted · {current['replied']} replied · "
         f"{current['emails_received']} email(s) received · {current['working_days']} working day(s)"
@@ -2134,6 +2162,7 @@ elif page == "Settings":
         st.markdown(
             "- **Engagement** (observed, decayed by freshness, capped per type): "
             "email reply 20 (max 40), inbound call 25 (max 50), LinkedIn reply 15 (max 30), "
+            "LinkedIn connection accepted 10 (max 10), "
             "phone conversation 15 (max 45), positive response +20 (max 40). "
             "Outbound attempts without reaction: 0 by design.\n"
             "- **Intent**: need identified 25, decision maker 15, budget confirmed 30, "

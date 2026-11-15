@@ -60,7 +60,11 @@ ENGAGEMENT_RULES = [
     ("inbound_call", "Inbound call", 25, 50,
      lambda i: i["direction"] == "Inbound" and i["channel"] == "Call"),
     ("inbound_linkedin", "LinkedIn reply / inbound message", 15, 30,
-     lambda i: i["direction"] == "Inbound" and i["channel"] == "LinkedIn"),
+     lambda i: i["direction"] == "Inbound" and i["channel"] == "LinkedIn"
+     and i["event_type"] != "Connection accepted"),
+    # Accepter une invitation est une réaction, mais bien plus faible qu'une réponse
+    ("linkedin_accepted", "LinkedIn connection accepted", 10, 10,
+     lambda i: i["channel"] == "LinkedIn" and i["event_type"] == "Connection accepted"),
     ("conversation", "Phone conversation", 15, 45,
      lambda i: i["direction"] == "Outbound" and i["channel"] == "Call"
      and i["event_type"] in CONVERSATION_RESULTS),

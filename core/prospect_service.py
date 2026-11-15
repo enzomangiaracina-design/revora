@@ -17,7 +17,7 @@ import re
 import pandas as pd
 
 import database
-from core.deduplication import normalize_email, normalize_phone
+from core.deduplication import normalize_email, normalize_linkedin_url, normalize_phone
 
 # Les statuts sont les étapes du pipeline, personnalisables et stockées en base
 # (table pipeline_stages). DEFAULT_STAGES ne sert que de valeur de repli pour
@@ -35,6 +35,7 @@ COLUMN_ALIASES = {
     "vertical": ["vertical", "verticale"],
     "email": ["email", "e-mail", "mail", "adresse email"],
     "phone": ["phone", "phone number", "telephone", "téléphone", "tel", "mobile"],
+    "linkedin_url": ["linkedin_url", "linkedin", "linkedin url", "linkedin profile", "profil linkedin"],
     "job_title": ["job_title", "job title", "poste", "fonction"],
     "status": ["status", "statut"],
     "source": ["source"],
@@ -81,6 +82,10 @@ def validate_prospect(data, statuses=None):
     if phone and normalize_phone(phone) is None:
         errors.append(f"Téléphone invalide : {phone}")
 
+    linkedin = (data.get("linkedin_url") or "").strip()
+    if linkedin and normalize_linkedin_url(linkedin) is None:
+        errors.append(f"URL LinkedIn invalide (profil attendu : linkedin.com/in/…) : {linkedin}")
+
     status = (data.get("status") or "").strip()
     if status and status not in statuses:
         errors.append(f"Statut inconnu : {status}")
@@ -93,10 +98,12 @@ def find_duplicate(data, prospects, exclude_id=None):
 
     Règles, dans l'ordre :
       1. même email (sans tenir compte des majuscules) ;
-      2. même prénom + nom + entreprise.
+      2. même profil LinkedIn ;
+      3. même prénom + nom + entreprise.
     """
 
     email = normalize_email(data.get("email"))
+    linkedin = normalize_linkedin_url(data.get("linkedin_url"))
     identity = _identity(data.get("first_name"), data.get("last_name"), data.get("company_name"))
 
     for prospect in prospects:
@@ -105,6 +112,9 @@ def find_duplicate(data, prospects, exclude_id=None):
 
         if email and normalize_email(prospect.get("email")) == email:
             return prospect, "même email"
+
+        if linkedin and normalize_linkedin_url(prospect.get("linkedin_url")) == linkedin:
+            return prospect, "même profil LinkedIn"
 
         if identity == _identity(
             prospect.get("first_name"), prospect.get("last_name"), prospect.get("company_name")
@@ -160,6 +170,7 @@ def create_prospect(data):
         source=data.get("source"),
         owner=data.get("owner"),
         hubspot_id=data.get("hubspot_id"),
+        linkedin_url=normalize_linkedin_url(data.get("linkedin_url")),
     )
 
 
@@ -192,6 +203,11 @@ def update_prospect(contact_id, data):
         data.get("status"),
         source=data.get("source"),
         owner=data.get("owner"),
+        # L'URL LinkedIn n'est modifiée que si le formulaire la fournit
+        **(
+            {"linkedin_url": normalize_linkedin_url(data.get("linkedin_url"))}
+            if "linkedin_url" in data else {}
+        ),
     )
 
 

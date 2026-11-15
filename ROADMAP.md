@@ -78,7 +78,11 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ Indicateurs individuels, comparaison de périodes, activité quotidienne, par verticale
 - ⬜ Par séquence (avec HubSpot), vues manager / équipe (phase 11)
 
-## Phase 9 — LinkedIn (API officielles uniquement) ⬜
+## Phase 9 — LinkedIn ✅ (saisie manuelle, conforme)
+- ✅ Vérification des API officielles et des conditions d'utilisation (`docs/LINKEDIN.md`)
+- ✅ URL du profil (formulaire, import CSV, fiche, doublons)
+- ✅ Actions LinkedIn (invitation, acceptation, InMail), scoring et performance
+- ⬜ Pas de connecteur : aucune API ouverte ne le permet (à revoir si une intégration Sales Navigator officielle devient disponible)
 ## Phase 10 — AI Copilot ⬜
 ## Phase 11 — Multi-utilisateur ⬜
 ## Phase 12 — Production (PostgreSQL, hébergement, sécurité, monitoring) ⬜

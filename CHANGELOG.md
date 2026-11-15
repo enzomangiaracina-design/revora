@@ -1,5 +1,35 @@
 # CHANGELOG — REVORA
 
+## [0.14.0] — 2026-11-15 — Phase 9 : LinkedIn (saisie manuelle, conforme)
+
+REVORA **ne se connecte pas à LinkedIn** : aucune API ouverte ne donne accès aux relations, messages ou
+profils d'autres membres, l'API Sales Navigator est fermée aux nouveaux partenaires, et les conditions
+d'utilisation interdisent scraping et automatisation. Détails et sources : `docs/LINKEDIN.md`.
+
+### Ajouté
+- **URL du profil LinkedIn** sur les prospects : formulaire, import CSV (colonnes « linkedin »,
+  « profil linkedin »…), fiche prospect (lien « Open profile »), liste des prospects.
+  Mise en forme unique (`https://www.linkedin.com/in/<identifiant>`), validation (seuls les profils
+  `/in/` sont acceptés), **détection de doublon par profil LinkedIn**.
+- **Actions LinkedIn** dans le formulaire d'interaction : *Connection request sent*, *Connection accepted*,
+  *InMail sent* — réservées au type LinkedIn, sens fixé automatiquement, objet facultatif.
+- **Scoring** : invitation acceptée = 10 points d'Engagement (plafond 10), distincte d'une réponse (15).
+- **Performance** : invitations envoyées, taux d'acceptation, messages LinkedIn envoyés.
+  Une invitation acceptée n'est pas comptée comme une réponse.
+- Base : colonne `contacts.linkedin_url` (migration automatique). `update_prospect` conserve l'URL
+  existante si l'argument n'est pas fourni.
+- `docs/LINKEDIN.md`. 19 nouveaux tests (228 au total).
+
+### Sécurité
+- L'identifiant du profil est limité aux caractères utilisés par LinkedIn : une URL piégée ne peut pas
+  détourner le lien affiché (testé).
+
+### Tests effectués
+- `python3 -m pytest` : 228 tests réussis ; `revora.db` inchangée. Les 9 pages s'affichent sans erreur.
+- Sur une copie : URL ajoutée par le formulaire (normalisée), URL invalide refusée, lien dans la fiche,
+  action LinkedIn enregistrée comme sortante, indicateurs LinkedIn dans Performance ; vérification visuelle.
+- Sauvegarde préalable : `backups/20261115-080507/`. Migration : colonne `contacts.linkedin_url`.
+
 ## [0.13.1] — 2026-11-15 — Correctifs du formulaire prospect
 
 ### Corrigé
