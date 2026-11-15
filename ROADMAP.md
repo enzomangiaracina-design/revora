@@ -108,6 +108,7 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 ## Phase 10 — AI Copilot 🟡
 - ✅ 10.1 Fiche prospect : préparation d'appel (faits sourcés, hypothèses, questions) et brouillon d'email,
   sur clic, désactivé par défaut, sans coordonnées envoyées, sources vérifiées (v0.25.0)
+- ✅ Fournisseur au choix : Claude ou Google Gemini (offre gratuite, données de démo uniquement) (v0.26.0)
 - ⬜ Premier appel réel avec votre clé (à lancer par vous) : mesurer coût et qualité
 - ⬜ 10.2 Chat sur l'ensemble de la base (plus de données envoyées : à décider)
 ## Phase 11 — Multi-utilisateur ⬜

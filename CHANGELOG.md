@@ -1,5 +1,30 @@
 # CHANGELOG — REVORA
 
+## [0.26.0] — 2026-11-15 — AI Copilot : Google Gemini en fournisseur alternatif
+
+### Ajouté
+- Settings › AI features › **AI provider** : Anthropic Claude (`claude-opus-5-5`) ou
+  **Google Gemini** (`gemini-3.8-flash`, offre gratuite). Avertissement affiché pour Gemini :
+  « Google may use the content sent to improve its products » — données de démo uniquement.
+- `ai/gemini_client.py` : même interface que le client Claude ; appel
+  `client.models.generate_content` avec `system_instruction`, `response_mime_type="application/json"`
+  et `response_json_schema` ; refus, coupure et erreurs (clé rejetée, quota gratuit atteint)
+  traduits en messages clairs. Clé lue dans `.env` (`GEMINI_API_KEY`).
+- `ai/providers.py` : choix du fournisseur (réglage `ai_provider`, Claude par défaut).
+- Fiche prospect : le panneau indique le fournisseur utilisé ; « free tier » au lieu d'un coût pour Gemini.
+- Dépendance `google-genai>=3.3.0` ; `.env.example` mis à jour.
+
+### Vérifications de la documentation
+- Page tarifs officielle (15/11/2026) : `gemini-3.8-flash` est gratuit sur l'offre gratuite ;
+  contenu « utilisé pour améliorer nos produits » sur l'offre gratuite, pas sur l'offre payante.
+- La documentation récente présente une nouvelle « Interactions API », sans paramètre de consigne
+  système documenté : REVORA utilise `generate_content`, dont les paramètres ont été vérifiés dans
+  le kit installé (google-genai 3.3.0).
+
+### Tests
+- 325 tests (8 nouveaux, faux client Gemini). Vérifié dans le navigateur sur une copie de la base,
+  sans clé. **Non vérifié** : un appel réel à Gemini (aucune clé configurée).
+
 ## [0.25.0] — 2026-11-15 — Phase 10.1 : AI Copilot dans la fiche prospect
 
 ### Ajouté

@@ -39,11 +39,17 @@ python3 -m pip install -r requirements.txt
 
 ### Activer l'AI Copilot (facultatif)
 
-1. Créez une clé API sur console.anthropic.com et fixez une **limite de dépense**.
-2. Ajoutez-la dans `.env` (jamais dans le code) : `ANTHROPIC_API_KEY=...`
-3. Relancez l'application, puis Settings › AI features › **Enable AI features**.
+Deux fournisseurs au choix (Settings › AI features › AI provider) :
 
-Coût indicatif : quelques centimes par génération (affiché sous chaque résultat).
+| Fournisseur | Clé dans `.env` | Coût | Données |
+|---|---|---|---|
+| Anthropic Claude (`claude-opus-5-5`) | `ANTHROPIC_API_KEY` (console.anthropic.com) | quelques centimes par génération | non utilisées pour l'entraînement |
+| Google Gemini (`gemini-3.8-flash`) | `GEMINI_API_KEY` (aistudio.google.com) | offre gratuite, quotas limités | **offre gratuite : utilisées par Google pour améliorer ses produits** |
+
+1. Créez la clé du fournisseur choisi (fixez une limite de dépense pour Claude).
+2. Ajoutez-la dans `.env` (jamais dans le code ni dans `.env.example`).
+3. Relancez l'application, choisissez le fournisseur, puis **Enable AI features**.
+
 N'utilisez que des données de démonstration ou de test, sauf autorisation.
 
 ## Lancer les tests

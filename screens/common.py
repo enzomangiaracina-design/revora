@@ -151,12 +151,14 @@ from integrations.hubspot.connector import HubSpotConnector
 from integrations.gmail.connector import GmailConnector
 
 # AI Copilot (phase 10.1)
-from ai.claude_client import (
-    MODEL as AI_MODEL,
-    API_KEY_NAME as AI_KEY_NAME,
-    CopilotError,
-    generate as ai_generate,
-    is_configured as ai_is_configured,
+from ai.claude_client import CopilotError
+from ai.providers import (
+    PROVIDERS as AI_PROVIDERS,
+    SETTING_PROVIDER as AI_PROVIDER_SETTING,
+    active as ai_provider,
+    active_name as ai_provider_name,
+    ai_generate,
+    ai_is_configured,
 )
 from core.copilot_service import (
     SETTING_ENABLED as AI_SETTING,

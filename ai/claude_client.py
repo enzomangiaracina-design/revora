@@ -23,6 +23,9 @@ EFFORT = "low"            # brief et brouillon courts : effort faible = moins ch
 MAX_TOKENS = 16000
 API_KEY_NAME = "ANTHROPIC_API_KEY"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
+LABEL = "Anthropic Claude"
+FREE_TIER_NOTE = None
+PRICES = (4.0, 20.0)      # dollars par million de jetons (entrée, sortie)
 
 
 class CopilotError(Exception):
