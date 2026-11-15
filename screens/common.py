@@ -79,7 +79,9 @@ from core.prospect_service import (
     update_prospect,
     filter_prospects,
     read_prospect_csv,
-    import_prospects
+    import_prospects,
+    COMPANY_SIZES,
+    save_company_details,
 )
 
 from database import (
@@ -136,7 +138,7 @@ from core.performance_service import (
     filter_by_owner
 )
 
-from database import get_recent_score_changes
+from database import get_recent_score_changes, get_recent_stage_changes
 from core.overview_service import (
     greeting,
     long_date,

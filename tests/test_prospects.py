@@ -198,3 +198,45 @@ def test_company_match_ignores_accented_case(temp_db):
     connection = sqlite3.connect(temp_db)
     assert connection.execute("SELECT count(*) FROM companies").fetchone()[0] == 1
     connection.close()
+
+
+# ---------- Infos entreprise (site, taille, pays) ----------
+
+from core.prospect_service import COMPANY_SIZES, normalize_website, save_company_details
+
+
+def test_website_is_normalized():
+    assert normalize_website(" nordvia.com ") == "https://nordvia.com"
+    assert normalize_website("http://nordvia.com/fr") == "http://nordvia.com/fr"
+    assert normalize_website("") is None
+
+
+def test_company_details_are_saved_and_shared(thomas):
+    database.create_prospect("Anna", "Petit", "AlphaEngine", "SaaS", "anna@example.com", "", "CFO")
+    company_id = database.get_prospect_by_id(thomas)["company_id"]
+
+    ok, _ = save_company_details(company_id, "alphaengine.io", COMPANY_SIZES[1], " France ")
+    assert ok
+
+    for prospect in database.get_all_prospects():                       # même entreprise : mêmes infos
+        details = database.get_prospect_by_id(prospect["id"])
+        assert details["company_website"] == "https://alphaengine.io"
+        assert details["company_size"] == "11-50" and details["company_country"] == "France"
+
+
+def test_invalid_company_details_are_refused(thomas):
+    company_id = database.get_prospect_by_id(thomas)["company_id"]
+
+    assert not save_company_details(company_id, "not a website")[0]
+    assert not save_company_details(company_id, size="huge")[0]
+    assert not save_company_details(9999, "alphaengine.io")[0]
+    assert database.get_prospect_by_id(thomas)["company_website"] is None   # rien n'a changé
+
+
+def test_company_details_can_be_cleared(thomas):
+    company_id = database.get_prospect_by_id(thomas)["company_id"]
+    save_company_details(company_id, "alphaengine.io", "1-10", "France")
+    save_company_details(company_id, "", None, "")
+
+    details = database.get_prospect_by_id(thomas)
+    assert details["company_website"] is None and details["company_size"] is None

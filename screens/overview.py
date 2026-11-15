@@ -233,7 +233,8 @@ def render(ctx):
         theme.section_title("Recent activity")
 
         feed = build_feed(
-            all_interactions, all_objections, prospects, get_recent_score_changes(), limit=8
+            all_interactions, all_objections, prospects, get_recent_score_changes(), limit=8,
+            stage_changes=get_recent_stage_changes(),
         )
 
         if not feed:

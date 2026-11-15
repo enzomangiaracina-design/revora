@@ -222,11 +222,12 @@ def _name(record):
     return f"{record.get('first_name') or ''} {record.get('last_name') or ''}".strip()
 
 
-def build_feed(interactions, objections, prospects, score_changes, limit=10):
+def build_feed(interactions, objections, prospects, score_changes, limit=10, stage_changes=()):
     """Fil chronologique des derniers événements enregistrés (plus récent d'abord).
 
     Événement : {"at", "kind", "title", "detail", "contact_id", "prospect", "company"}.
     Chaque événement est rattaché à un prospect (lien vers sa fiche).
+    stage_changes : get_recent_stage_changes (changements d'étape, facultatif).
     """
 
     by_id = {p["id"]: p for p in prospects}
@@ -281,6 +282,17 @@ def build_feed(interactions, objections, prospects, score_changes, limit=10):
             "contact_id": change["contact_id"],
             "prospect": _name(prospect),
             "company": prospect.get("company_name") or "",
+        })
+
+    for change in stage_changes:
+        events.append({
+            "at": change["occurred_at_local"],
+            "kind": "Stage",
+            "title": f"Stage → {change['to_stage']}",
+            "detail": f"from {change['from_stage']}" if change.get("from_stage") else "",
+            "contact_id": change["contact_id"],
+            "prospect": _name(change),
+            "company": change.get("company_name") or "",
         })
 
     events.sort(key=lambda e: e["at"], reverse=True)

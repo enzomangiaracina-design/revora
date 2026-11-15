@@ -26,6 +26,10 @@ DEFAULT_STAGES = database.DEFAULT_STAGES
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# Infos entreprise (partagées par tous les contacts de l'entreprise)
+COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-1,000", "1,001-5,000", "5,000+"]
+WEBSITE_PATTERN = re.compile(r"^https?://[^\s/.]+(\.[^\s/.]+)+(/\S*)?$", re.IGNORECASE)
+
 # Noms de colonnes CSV reconnus (en minuscules) pour chaque champ REVORA.
 # Inclut les en-têtes d'un export HubSpot ("First Name", "Phone Number"...).
 COLUMN_ALIASES = {
@@ -209,6 +213,34 @@ def update_prospect(contact_id, data):
             if "linkedin_url" in data else {}
         ),
     )
+
+
+def normalize_website(value):
+    """« nordvia.com » -> « https://nordvia.com » ; vide -> None."""
+
+    value = (value or "").strip()
+
+    if not value:
+        return None
+
+    return value if re.match(r"^https?://", value, re.IGNORECASE) else f"https://{value}"
+
+
+def save_company_details(company_id, website=None, size=None, country=None):
+    """Valide puis enregistre le site, la taille et le pays. Retourne (succès, message)."""
+
+    website = normalize_website(website)
+
+    if website and not WEBSITE_PATTERN.match(website):
+        return False, "Enter a valid website, for example nordvia.com."
+
+    if size and size not in COMPANY_SIZES:
+        return False, "Choose a company size from the list."
+
+    if not database.update_company_details(company_id, website, size, (country or "").strip() or None):
+        return False, "Company not found."
+
+    return True, "Company details saved."
 
 
 # ==========================================

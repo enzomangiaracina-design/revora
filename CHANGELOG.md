@@ -1,5 +1,22 @@
 # CHANGELOG — REVORA
 
+## [0.31.0] — 2026-11-15 — Finitions : étapes dans le fil, infos entreprise
+
+### Ajouté
+- Overview › **Recent activity** : les changements d'étape apparaissent dans le fil
+  (« Stage → To follow up », icône Kanban, lien vers la fiche), qu'ils viennent du Pipeline, du
+  sélecteur d'étape de la fiche ou du formulaire de modification. `database.get_recent_stage_changes`.
+- Fiche prospect : panneau **Company** (site, taille, pays) et fenêtre **Edit company**.
+  - Les infos sont partagées par tous les contacts de la même entreprise.
+  - Site complété automatiquement (`nordvia.com` → `https://nordvia.com`) et vérifié ; taille
+    choisie dans une liste (`COMPANY_SIZES`) ; champs vides = effacés.
+  - Utilise les colonnes `companies.website/size/country` déjà présentes : aucune migration.
+  - `database.update_company_details`, `prospect_service.save_company_details` / `normalize_website`.
+
+### Tests
+- 364 tests (6 nouveaux). Vérifié dans le navigateur sur une copie de `demo.db` : infos entreprise
+  enregistrées et affichées, changement d'étape visible dans le fil. `revora.db` et `demo.db` inchangées.
+
 ## [0.30.0] — 2026-11-15 — Détection des objections par IA
 
 ### Ajouté

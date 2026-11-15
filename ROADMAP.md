@@ -18,7 +18,8 @@ Légende : ✅ fait · 🟡 en cours · ⬜ à faire
 - ✅ Import CSV (rapport détaillé)
 - ✅ Recherche et filtres (verticale, statut, source)
 - ✅ Verticales personnalisables (choisir ou saisir)
-- ⬜ Plus tard : édition des infos entreprise (site, taille, pays), filtre par commercial (phase 4),
+- ✅ Édition des infos entreprise : site, taille, pays (v0.31.0)
+- ⬜ Plus tard : filtre par commercial (phase 4),
   synchronisation CRM (phase 6)
 
 ## Phase 3 — Activity Manager ✅
@@ -95,7 +96,7 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 
 ## Overview — cockpit du SDR ✅
 - ✅ KPI du jour, Today's focus explicable, fil d'activité, résumé 7 jours, états vides, mobile
-- ⬜ Historique des changements d'étape (pour les afficher dans le fil d'activité)
+- ✅ Changements d'étape affichés dans le fil « Recent activity » (v0.31.0)
 
 ## Module H — Performance ✅ (avant la phase 9)
 - ✅ Indicateurs individuels, comparaison de périodes, activité quotidienne, par verticale

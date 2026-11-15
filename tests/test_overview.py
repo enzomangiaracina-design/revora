@@ -156,3 +156,21 @@ def test_recent_score_changes(thomas):
 
     # Petite variation (< 5 points) ignorée par défaut
     assert database.get_recent_score_changes(min_change=1000) == []
+
+
+# ---------- Changements d'étape dans le fil « Recent activity » ----------
+
+def test_stage_changes_appear_in_the_feed(thomas):
+    database.set_prospect_stage(thomas, "Interested")
+
+    changes = database.get_recent_stage_changes()
+    assert changes[0]["to_stage"] == "Interested" and changes[0]["first_name"] == "Thomas"
+    assert changes[0]["company_name"] == "AlphaEngine"
+
+    feed = overview.build_feed([], [], [], [], stage_changes=changes)
+    assert feed[0]["kind"] == "Stage" and feed[0]["title"] == "Stage → Interested"
+    assert feed[0]["detail"].startswith("from ") and feed[0]["contact_id"] == thomas
+
+
+def test_feed_without_stage_changes_is_unchanged():
+    assert overview.build_feed([], [], [], []) == []

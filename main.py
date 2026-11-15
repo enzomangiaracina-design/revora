@@ -80,7 +80,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("VERSION 0.30.0")
+st.sidebar.caption("VERSION 0.31.0")
 
 # Base de démonstration ou autre base choisie avec REVORA_DATABASE : toujours visible
 if not database.is_default_database():

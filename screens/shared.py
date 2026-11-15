@@ -412,6 +412,7 @@ FEED_ICONS = {
     "Objection": ":material/forum:",
     "Prospect": ":material/person_add:",
     "Score": ":material/trending_up:",
+    "Stage": ":material/view_kanban:",
 }
 
 

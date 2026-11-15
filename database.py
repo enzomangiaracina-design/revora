@@ -394,6 +394,27 @@ def _clean(value):
     return value or None
 
 
+def update_company_details(company_id, website, size, country):
+    """Met a jour le site, la taille et le pays d'une entreprise.
+
+    L'entreprise est partagee par tous ses contacts. Retourne True si elle existe.
+    """
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute(
+            "UPDATE companies SET website = ?, size = ?, country = ? WHERE id = ?",
+            (_clean(website), _clean(size), _clean(country), company_id)
+        )
+        connection.commit()
+
+        return cursor.rowcount > 0
+
+    finally:
+        connection.close()
+
+
 def _get_or_create_company(cursor, company_name, vertical):
     """Retourne l'id de l'entreprise (meme nom et meme verticale), en la creant si besoin."""
 
@@ -588,7 +609,10 @@ def get_prospect_by_id(contact_id):
             contacts.*,
             datetime(contacts.created_at, 'localtime') AS created_at_local,
             companies.name AS company_name,
-            companies.vertical
+            companies.vertical,
+            companies.website AS company_website,
+            companies.size AS company_size,
+            companies.country AS company_country
         FROM contacts
 
         LEFT JOIN companies
@@ -1936,6 +1960,40 @@ def create_task(contact_id, title, description, due_at):
 # ==========================================
 # 9. RECUPERATION DES RELANCES
 # ==========================================
+
+def get_recent_stage_changes(limit=20):
+    """Derniers changements d'etape, tous prospects confondus (plus recent d'abord).
+
+    Chaque ligne contient aussi le nom du prospect et de son entreprise
+    (pour le fil « Recent activity » de l'Overview).
+    """
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT
+            stage_changes.contact_id,
+            stage_changes.from_stage,
+            stage_changes.to_stage,
+            stage_changes.source,
+            datetime(stage_changes.changed_at, 'localtime') AS occurred_at_local,
+            contacts.first_name,
+            contacts.last_name,
+            companies.name AS company_name
+        FROM stage_changes
+        JOIN contacts ON contacts.id = stage_changes.contact_id
+        LEFT JOIN companies ON companies.id = contacts.company_id
+        ORDER BY stage_changes.id DESC
+        LIMIT ?
+        """,
+        (limit,)
+    ).fetchall()
+
+    connection.close()
+
+    return [dict(row) for row in rows]
+
 
 def get_stage_changes(contact_id):
     """Changements d'etape d'un prospect, du plus recent au plus ancien."""

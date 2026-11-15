@@ -150,6 +150,29 @@ def edit_prospect_dialog(contact_id):
             st.error(message)
 
 
+@st.dialog("Edit company")
+def edit_company_dialog(prospect):
+    st.caption(f"Shared by every prospect at {prospect['company_name']}.")
+
+    with st.form(f"dialog_company_{prospect['company_id']}"):
+        website = st.text_input("Website", value=prospect.get("company_website") or "",
+                                placeholder="nordvia.com")
+        size = st.selectbox("Size (employees)", COMPANY_SIZES, index=(
+            COMPANY_SIZES.index(prospect["company_size"]) if prospect.get("company_size") in COMPANY_SIZES else None
+        ), placeholder="Not provided")
+        country = st.text_input("Country", value=prospect.get("company_country") or "", placeholder="France")
+        submitted = st.form_submit_button("Save company", width="stretch")
+
+    if submitted:
+        ok, message = save_company_details(prospect["company_id"], website, size, country)
+
+        if ok:
+            st.session_state["flash"] = message
+            st.rerun()
+        else:
+            st.error(message)
+
+
 def _change_stage(contact_id, widget_key, current_stage):
     """Callback du choix d'étape dans l'en-tête (confirmation si l'étape est fermée)."""
 
@@ -553,6 +576,22 @@ def render(ctx):
                 f"**LinkedIn:** "
                 + (f"[Open profile]({prospect['linkedin_url']})" if prospect.get("linkedin_url") else "Not provided")
             )
+
+        if prospect.get("company_id"):
+            with st.expander("Company", icon=":material/domain:"):
+                website = prospect.get("company_website")
+                # Lien affiché sans « https:// » : [nordvia.com](https://nordvia.com)
+                website_link = f"[{website.split('://', 1)[-1]}]({website})" if website else "Not provided"
+                st.markdown(
+                    f"**{prospect['company_name']}**" + (f" · {prospect['vertical']}" if prospect.get("vertical") else "")
+                    + "  \n"
+                    f"**Website:** {website_link}  \n"
+                    f"**Size:** {prospect.get('company_size') or 'Not provided'}  \n"
+                    f"**Country:** {prospect.get('company_country') or 'Not provided'}"
+                )
+                if st.button("Edit company", icon=":material/edit:", type="tertiary",
+                             key=f"edit_company_{contact_id}"):
+                    edit_company_dialog(prospect)
 
         counts = count_by_channel(interactions)
 
