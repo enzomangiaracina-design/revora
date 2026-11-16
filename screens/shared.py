@@ -37,6 +37,22 @@ def reset_form(form_key):
 USER_KEY = "user"   # clé du menu « Signed in as » (et paramètre ?user=<id> de l'URL)
 
 
+# ---------- Sauvegarde quotidienne (phase 12.3) ----------
+
+def ensure_daily_backup():
+    """Une copie de la base par jour, au premier affichage. Ne bloque jamais l'application."""
+
+    if st.session_state.get("_backup_checked"):
+        return
+
+    st.session_state["_backup_checked"] = True
+
+    try:
+        daily_backup(database.DATABASE_PATH)
+    except Exception as error:                      # disque plein, droits… : on le note, on continue
+        log_error(error, "daily backup")
+
+
 # ---------- Vraie connexion (phase 12.1) ----------
 
 def auth_enabled():
@@ -694,17 +710,24 @@ OPEN_PIPELINE = {
 }
 
 
-def error_state(error):
+def log_error(error, where):
+    """Note l'erreur dans logs/errors.log (phase 12.3) et dans le terminal. Retourne le détail."""
+
+    details = record_error(error, where, database.DATABASE_PATH)
+    print(details)  # aussi visible dans le terminal qui a lance streamlit
+
+    return details
+
+
+def error_state(error, where="page"):
     """Erreur inattendue d'une page : message clair, actions, details techniques.
 
     Les donnees ne sont pas touchees : les ecritures en base se font dans des
-    transactions qui sont annulees en cas d'erreur.
+    transactions qui sont annulees en cas d'erreur. L'erreur est notee dans
+    logs/errors.log (phase 12.3).
     """
 
-    import traceback
-
-    details = "".join(traceback.format_exception(error))
-    print(details)  # aussi visible dans le terminal qui a lance streamlit
+    details = log_error(error, where)
 
     with st.container(border=True):
         st.markdown(":material/error: **This page hit an unexpected error.**")

@@ -169,6 +169,31 @@ donc l'app utilise toujours `~/Documents/REVORA/revora.db`, quel que soit le dos
 
 ## Sauvegarder la base
 
+**Automatique (phase 12.3)** : une copie par jour, faite au premier affichage, dans
+`backups/auto/<nom de la base>/` (les 14 plus récentes sont gardées). Settings › *Backups and errors*
+affiche la dernière et permet « Back up now ».
+
+En ligne de commande (base par défaut `revora.db`, ou celle de `REVORA_DATABASE`) :
+
+```bash
+python3 backup_db.py
+```
+
+```bash
+python3 backup_db.py --list
+```
+
+Restaurer (la base actuelle est d'abord sauvegardée ; sans `--yes`, rien n'est fait) :
+
+```bash
+python3 backup_db.py --restore backups/auto/revora/auto-AAAAMMJJ-HHMMSS.db --yes
+```
+
+Copie manuelle ponctuelle :
+
 ```bash
 sqlite3 revora.db ".backup backups/revora-$(date +%Y%m%d-%H%M%S).db"
 ```
+
+**Journal des erreurs** : chaque erreur inattendue est notée dans `logs/errors.log` (exclu de Git) et
+les dernières sont visibles dans Settings › *Backups and errors*.

@@ -8,6 +8,7 @@
 ## Règles absolues
 - **Ne jamais supprimer `revora.db`.**
 - Avant toute migration ou modification importante : copie horodatée des fichiers et de la base dans `backups/<date-heure>/` (utiliser `sqlite3 revora.db ".backup ..."`).
+- Sauvegardes automatiques : `backups/auto/` (gérées par `core/backup_service.py`). Dans les tests et essais en terminal, toujours passer `REVORA_DATABASE` explicitement à chaque commande (jamais via une variable qui pourrait être vide) : sinon la commande vise `revora.db`.
 - Ne jamais écraser ou modifier les données de démonstration sans autorisation.
 - Tester sur une **copie** de la base, jamais sur `revora.db` directement.
 - Toujours lire les fichiers réellement présents sur le disque avant de les modifier ; ne pas se fier aux versions échangées précédemment.

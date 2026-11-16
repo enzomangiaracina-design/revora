@@ -138,6 +138,47 @@ def team_section(ctx, prospects):
             st.error(message)
 
 
+# ---------- Sauvegardes et erreurs (phase 12.3) ----------
+
+def _backup_now():
+    try:
+        path = backup_now(database.DATABASE_PATH)
+        st.session_state["flash"] = f"Backup saved: {path.name}."
+    except Exception as error:
+        log_error(error, "manual backup")
+        st.session_state["flash"] = f"Error: backup failed ({error})."
+
+
+def backups_section():
+    """Dernière sauvegarde, sauvegarde immédiate, et dernières erreurs notées."""
+
+    st.subheader("Backups and errors")
+    backups = list_backups(database.DATABASE_PATH)
+    folder = backup_dir(database.DATABASE_PATH)
+
+    if backups:
+        last = backups[0][0]
+        st.caption(
+            f":material/backup: Last automatic backup: **{last.strftime('%d/%m/%Y %H:%M')}** · "
+            f"{len(backups)} kept (the {BACKUP_KEEP} most recent) in `backups/auto/{folder.name}`."
+        )
+    else:
+        st.caption(":material/backup: No automatic backup yet. One is made each day when REVORA first opens.")
+
+    st.caption("To restore a backup, use the command line (see README): REVORA first saves the current "
+               "database, so nothing can be lost.")
+    st.button("Back up now", icon=":material/save:", key="backup_now", on_click=_backup_now)
+
+    errors = recent_errors(database.DATABASE_PATH, limit=5)
+    if errors:
+        with st.expander(f"Recent errors ({len(errors)})", icon=":material/error:"):
+            for stamp, where, details in errors:
+                st.markdown(f"**{stamp}** · {where}")
+                st.code(details[-1500:], language="text")
+    else:
+        st.caption(":material/check_circle: No error recorded.")
+
+
 def _choose_provider():
     name = st.session_state["ai_provider_choice"]
     set_setting(AI_PROVIDER_SETTING, name)
@@ -322,6 +363,11 @@ def render(ctx):
 
     st.divider()
     team_section(ctx, prospects)
+
+    # ---------- SAUVEGARDES ET ERREURS (phase 12.3) ----------
+
+    st.divider()
+    backups_section()
 
     # ---------- INTEGRATIONS ----------
 

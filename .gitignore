@@ -6,8 +6,11 @@
 *.db-journal
 *.sqlite3
 
-# Sauvegardes locales
+# Sauvegardes locales (dont backups/auto/, sauvegardes quotidiennes)
 backups/
+
+# Journal des erreurs (peut contenir des données de la base)
+logs/
 
 # Fichiers générés par Python
 __pycache__/

@@ -131,7 +131,7 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ 12.1 Vraie connexion (st.login, OIDC Google / Microsoft), inactive sans configuration (v0.35.0)
 - ⬜ 12.1 bis Premier test réel avec une application OAuth de test (à créer par l'utilisateur)
 - ⬜ 12.2 Hébergement du pilote (choix de l'hébergeur, disque permanent, HTTPS), données de démo uniquement
-- ⬜ 12.3 Sauvegardes automatiques et suivi des erreurs
+- ✅ 12.3 Sauvegardes quotidiennes, restauration sûre, journal des erreurs (v0.36.0)
 - ⬜ Organisations (isolation des données entre entreprises)
 
 ## Phase 13 — REVORA Intelligence (AI Copilot + REVORA MEMORY) ⬜ vision, non commencée

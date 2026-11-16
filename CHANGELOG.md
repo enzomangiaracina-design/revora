@@ -1,5 +1,29 @@
 # CHANGELOG — REVORA
 
+## [0.36.0] — 2026-11-16 — Phase 12.3 : sauvegardes automatiques et journal des erreurs
+
+### Ajouté
+- **Sauvegarde quotidienne automatique** au premier affichage du jour, dans `backups/auto/<base>/`
+  (API « backup » de SQLite : copie cohérente même pendant une écriture). Les 14 plus récentes sont
+  gardées ; les autres sauvegardes (`backups/<date-heure>/`) et tout fichier étranger ne sont jamais
+  supprimés. Une panne de sauvegarde n'empêche jamais l'application de s'ouvrir.
+- `backup_db.py` : sauvegarder, lister, **restaurer** (`--restore FICHIER --yes`). La base actuelle est
+  d'abord sauvegardée ; une sauvegarde abîmée, un dossier ou un chemin vide sont refusés.
+- **Journal des erreurs** `logs/errors.log` (rotation 1 Mo × 3, exclu de Git) : page concernée et détail
+  technique de chaque erreur inattendue.
+- Settings › **Backups and errors** : dernière sauvegarde, « Back up now », 5 dernières erreurs.
+- `core/backup_service.py`, `core/error_log.py`.
+
+### Sécurité (incident pendant les tests, corrigé)
+- Un essai de la commande a visé `revora.db` par erreur (variable de test non définie). La restauration
+  a échoué avant toute écriture ; `revora.db` a été vérifiée **identique** à la sauvegarde du matin.
+  Le test a révélé deux défauts, corrigés : `restore()` acceptait un dossier (chemin vide = « . ») et la
+  commande un nom de fichier vide.
+
+### Tests
+- 392 tests (8 nouveaux dans `tests/test_backup.py`). Commande testée sur une copie de `demo.db` :
+  sauvegarde, liste, refus sans `--yes`, restauration (17 relances retrouvées) avec copie de sécurité.
+
 ## [0.35.0] — 2026-11-15 — Phase 12.1 : vraie connexion (voie A)
 
 ### Ajouté

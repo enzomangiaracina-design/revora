@@ -15,7 +15,8 @@ import database
 from database import get_all_prospects, get_stage_names, get_users, initialize_database
 from screens import AppContext
 from screens.shared import (
-    auth_enabled, close_prospect, error_state, require_login, sidebar_identity, signed_in_user,
+    auth_enabled, close_prospect, ensure_daily_backup, error_state, require_login, sidebar_identity,
+    signed_in_user,
 )
 from screens import overview, prospects, prospect_details, pipeline, activity, objections, copilot, performance, settings
 from ui import theme
@@ -31,6 +32,7 @@ st.set_page_config(
 )
 
 initialize_database()
+ensure_daily_backup()          # phase 12.3 : une copie de la base par jour (backups/auto/)
 
 # Données communes, chargées une fois par affichage :
 #  - prospects : la base ;
@@ -101,7 +103,7 @@ if ctx.auth:
 else:
     ctx.user = signed_in_user(ctx.users)
 
-st.sidebar.caption("VERSION 0.35.0")
+st.sidebar.caption("VERSION 0.36.0")
 
 # Base de démonstration ou autre base choisie avec REVORA_DATABASE : toujours visible
 if not database.is_default_database():
@@ -132,4 +134,4 @@ try:
     else:
         PAGES[page](ctx)
 except Exception as error:
-    error_state(error)
+    error_state(error, "prospect details" if st.session_state.get("prospect_open") else page)

@@ -9,6 +9,8 @@ from datetime import date, datetime, timedelta
 import streamlit as st
 import pandas as pd
 
+import database
+
 from ui import theme
 
 from database import (
@@ -185,6 +187,18 @@ from core.copilot_service import (
 )
 
 from database import get_setting, set_setting
+
+# Journal des erreurs (phase 12.3)
+from core.error_log import record as record_error, recent_errors, log_path as error_log_path
+
+# Sauvegardes automatiques (phase 12.3)
+from core.backup_service import (
+    KEEP as BACKUP_KEEP,
+    backup_dir,
+    backup_now,
+    daily_backup,
+    list_backups,
+)
 
 # Vraie connexion (phase 12.1)
 from core.auth_service import (
