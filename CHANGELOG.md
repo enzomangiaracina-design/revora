@@ -1,5 +1,34 @@
 # CHANGELOG — REVORA
 
+## [0.38.0] — 2026-11-16 — Phase 13 : fondations de la mémoire (rien ne change à l'écran)
+
+### Ajouté
+- **Auteur de chaque action** : colonne `created_by` (identifiant de l'utilisateur actif) sur
+  `interactions`, `tasks`, `objections` et `stage_changes`. Elle est remplie par tous les écrans
+  (échange, relance, objection, changement d'étape, modification du prospect) avec la personne de la
+  vraie connexion ou de « Signed in as ». Elle reste vide si l'équipe est vide, pour les données
+  anciennes et pour les synchronisations.
+- **`tasks.completed_at`** : date de réalisation d'une relance, fixée au premier « Done » et jamais
+  écrasée ensuite.
+- **Journal d'événements** (`activity_events`, `core/event_service.py`) : on y ajoute des lignes, sans
+  jamais en modifier ni en supprimer. Il note :
+  - les suggestions d'objections IA acceptées (catégorie proposée et catégorie retenue) ou refusées ;
+  - les brouillons d'email IA gardés ;
+  - les relances terminées, avec qui les a faites.
+  Un nom d'action inconnu est refusé. Ni email, ni téléphone, ni secret n'y est écrit.
+- `activity_service.complete_follow_up` : termine une relance et la note au journal.
+
+### Migration
+- Additive : 5 nouvelles colonnes vides, une nouvelle table et un index. Testée sur des copies de
+  `revora.db` et `demo.db` : les comptages de lignes sont identiques avant et après.
+
+### Tests
+- 408 tests, dont 9 nouveaux dans `tests/test_events.py` :
+  - auteur, date de réalisation et journal ;
+  - migration d'une ancienne base ;
+  - écran réel : clic sur « Done », puis Add et Dismiss avec une IA simulée.
+- Toutes les pages s'affichent sans erreur sur la copie de démo migrée.
+
 ## [0.37.0] — 2026-11-16 — Phase 12.2 : pilote Render préparé (rien n'est déployé)
 
 ### Ajouté

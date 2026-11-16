@@ -40,6 +40,9 @@
 - Vraie connexion (phase 12.1) : `st.login` (OIDC), active seulement si `.streamlit/secrets.toml` contient
   `[auth]` complet (`ctx.auth`). Accès = email d'un membre actif de l'équipe. Jamais de mot de passe
   stocké par REVORA ; `secrets.toml` reste hors de Git.
+- Mémoire (phase 13, fondations) : `created_by` = `users.id` de l'auteur (via `current_user_id()` dans
+  `screens/shared.py`, NULL si inconnu) ; journal `activity_events` en ajout seul, actions listées dans
+  `core/event_service.ACTIONS`. Rien n'est encore « appris » : aucune mémoire n'est déduite du journal.
 - Interactions : `UNIQUE(provider, external_id)` garantit l'idempotence des synchronisations futures ; les saisies manuelles utilisent `provider = 'manual'`.
 - Les futurs connecteurs suivront l'interface `authenticate / test_connection / fetch_events / normalize_event / sync_events`, découplés du scoring.
 - Scoring prévu : global = 0,35 × Fit + 0,40 × Engagement + 0,25 × Intent (pondérations configurables, scores sur 100).

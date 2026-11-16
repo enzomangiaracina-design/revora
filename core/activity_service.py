@@ -12,6 +12,7 @@ d'enregistrer deux fois la même interaction.
 from datetime import date, datetime, timedelta
 
 import database
+from core import event_service
 
 CHANNELS = ["Call", "Email", "LinkedIn", "Note"]
 
@@ -98,13 +99,15 @@ def _validate(data, now):
     }
 
 
-def log_interaction(contact_id, data, now=None):
+def log_interaction(contact_id, data, now=None, created_by=None):
     """Valide puis enregistre une interaction, et crée la relance si demandée.
 
     `data` contient : channel, direction, event_type, subject, content,
     outcome, occurred_at (datetime locale), duration_minutes (appels),
     follow_up_date (date optionnelle), objection_category et
     objection_verbatim (optionnels : objection exprimée pendant l'échange).
+
+    created_by : users.id de l'auteur, noté sur l'échange, l'objection et la relance.
 
     Retourne (succès, message).
     """
@@ -125,6 +128,7 @@ def log_interaction(contact_id, data, now=None):
         clean["outcome"],
         occurred_at=clean["occurred_at"],
         metadata=clean["metadata"],
+        created_by=created_by,
     )
 
     done = ["Interaction saved"]
@@ -138,6 +142,7 @@ def log_interaction(contact_id, data, now=None):
             verbatim=data.get("objection_verbatim"),
             interaction_id=interaction_id,
             occurred_at=clean["occurred_at"],
+            created_by=created_by,
         )
         done.append(f"objection « {objection} » noted")
 
@@ -145,10 +150,18 @@ def log_interaction(contact_id, data, now=None):
 
     if follow_up_date:
         title = clean["outcome"] or f"Follow up after {data['channel'].lower()}"
-        database.create_task(contact_id, title, clean["content"], follow_up_date.isoformat())
+        database.create_task(contact_id, title, clean["content"], follow_up_date.isoformat(),
+                             created_by=created_by)
         done.append("follow-up scheduled")
 
     return True, ", ".join(done) + "."
+
+
+def complete_follow_up(task_id, user_id=None, contact_id=None):
+    """Termine une relance (date de réalisation) et note QUI l'a faite dans le journal."""
+
+    database.complete_task(task_id)
+    event_service.record("task_completed", user_id, object_id=task_id, contact_id=contact_id)
 
 
 def is_editable(interaction):

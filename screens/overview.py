@@ -17,8 +17,8 @@ LATER = [("+1 day", 1), ("+3 days", 3), ("+1 week", 7)]
 
 # ---------- Actions rapides du Today's Focus (callbacks) ----------
 
-def _complete(task_id, title):
-    complete_task(task_id)
+def _complete(task_id, title, contact_id=None):
+    complete_follow_up(task_id, current_user_id(), contact_id)
     st.session_state["flash"] = f"Follow-up completed: {title}"
 
 
@@ -199,7 +199,7 @@ def render(ctx):
                     if row["task_id"] and row["due_state"] in ("overdue", "today"):
                         st.button(
                             "", icon=":material/check:", key=f"focus_done_{row['id']}",
-                            on_click=_complete, args=(row["task_id"], row["task_title"]),
+                            on_click=_complete, args=(row["task_id"], row["task_title"], row["id"]),
                             help=f"Mark « {row['task_title']} » as done",
                         )
 

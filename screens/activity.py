@@ -156,7 +156,7 @@ def render(ctx):
             submitted, contact_id, data = interaction_form("log_activity_form", options)
 
             if submitted:
-                ok, message = log_interaction(contact_id, data)
+                ok, message = log_interaction(contact_id, data, created_by=current_user_id())
 
                 if ok:
                     reset_form("log_activity_form")   # formulaire neuf ; en cas d'erreur la saisie reste

@@ -142,7 +142,7 @@ def render(ctx):
             )
 
             if submitted:
-                ok, message = update_prospect(contact_id, data)
+                ok, message = update_prospect(contact_id, data, created_by=current_user_id())
 
                 if ok:
                     st.session_state["flash"] = message

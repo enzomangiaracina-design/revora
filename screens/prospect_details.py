@@ -40,7 +40,7 @@ def log_interaction_dialog(contact_id):
     submitted, _, data = interaction_form(f"dialog_interaction_{contact_id}")
 
     if submitted:
-        ok, message = log_interaction(contact_id, data)
+        ok, message = log_interaction(contact_id, data, created_by=current_user_id())
 
         if ok:
             reset_form(f"dialog_interaction_{contact_id}")
@@ -95,7 +95,7 @@ def follow_up_dialog(contact_id):
         if not title.strip():
             st.error("Enter an action title.")
         else:
-            create_task(contact_id, title, description, due_date.isoformat())
+            create_task(contact_id, title, description, due_date.isoformat(), created_by=current_user_id())
             st.session_state["flash"] = "Follow-up scheduled."
             st.rerun()
 
@@ -124,7 +124,8 @@ def objection_dialog(contact_id):
         submitted = st.form_submit_button("Add objection", width="stretch")
 
     if submitted:
-        ok, message = record_objection(contact_id, category, verbatim, interaction_id=raised_during)
+        ok, message = record_objection(contact_id, category, verbatim, interaction_id=raised_during,
+                                       created_by=current_user_id())
 
         if ok:
             st.session_state["flash"] = message
@@ -141,7 +142,7 @@ def edit_prospect_dialog(contact_id):
     )
 
     if submitted:
-        ok, message = update_prospect(contact_id, data)
+        ok, message = update_prospect(contact_id, data, created_by=current_user_id())
 
         if ok:
             st.session_state["flash"] = message
@@ -208,8 +209,9 @@ def _run_ai(task, contact_id, context):
 
 
 def _save_draft_as_note(contact_id, draft):
-    add_interaction(contact_id, "Note", "Internal", "Other", f"Email draft: {draft['subject']}",
-                    draft["body"], "")
+    note_id = add_interaction(contact_id, "Note", "Internal", "Other", f"Email draft: {draft['subject']}",
+                              draft["body"], "", created_by=current_user_id())
+    record_event("ai_draft_kept", current_user_id(), object_id=note_id, contact_id=contact_id)
     st.session_state["flash"] = "Email draft saved as a note in the timeline."
 
 
@@ -239,16 +241,23 @@ def _answer_suggestion(contact_id, index, accept):
 
     suggestion = st.session_state[f"ai_objections_{contact_id}"]["suggestions"][index]
 
+    # Journal (phase 13) : catégorie proposée, catégorie retenue et passage cité
+    details = {"suggested_category": suggestion["category"], "wording": suggestion["wording"]}
+
     if not accept:
         suggestion["status"] = "dismissed"
+        record_event("ai_objection_dismissed", current_user_id(), contact_id=contact_id, details=details)
         return
 
     # Le commercial peut corriger la catégorie avant d'ajouter
     category = st.session_state.get(f"ai_objection_category_{contact_id}_{index}") or suggestion["category"]
     ok, message = record_objection(contact_id, category, suggestion["wording"],
-                                   interaction_id=suggestion["interaction_id"], source="ai")
+                                   interaction_id=suggestion["interaction_id"], source="ai",
+                                   created_by=current_user_id())
     if ok:
         suggestion["status"] = "added"
+        record_event("ai_objection_accepted", current_user_id(), contact_id=contact_id,
+                     details={**details, "category": category})
     st.session_state["flash"] = message
 
 
@@ -510,7 +519,7 @@ def render(ctx):
                 f":material/flag: **Next action:** {task['title']} · due {task['due_at'] or 'no date'}{late}"
             )
             if col_done.button("Done", key=f"next_done_{task['id']}", width="stretch"):
-                complete_task(task["id"])
+                complete_follow_up(task["id"], current_user_id(), contact_id)
                 st.session_state["flash"] = f"Follow-up completed: {task['title']}"
                 st.rerun()
         else:

@@ -211,6 +211,18 @@ def show_everyone():
     st.session_state[SCOPE_KEY] = EVERYONE
 
 
+def current_user_id():
+    """users.id de la personne active (vraie connexion ou « Signed in as »), ou None.
+
+    Sert d'AUTEUR aux actions enregistrées (fondations de la mémoire, phase 13).
+    Lu dans st.session_state : propre à chaque session, donc à chaque navigateur.
+    """
+
+    chosen = st.session_state.get(USER_KEY)
+
+    return chosen if isinstance(chosen, int) else None
+
+
 def current_user_name():
     """Nom de l'utilisateur choisi dans « Signed in as », ou None."""
 
@@ -515,7 +527,7 @@ def request_stage_change(contact_id, stage_name):
         }
         return False
 
-    ok, message = set_prospect_stage(contact_id, stage_name)
+    ok, message = set_prospect_stage(contact_id, stage_name, created_by=current_user_id())
     st.session_state["flash"] = message if ok else f"Error: {message}"
     return ok
 
@@ -524,7 +536,7 @@ def _confirm_stage_change():
     pending = st.session_state.pop(PENDING_STAGE, None)
 
     if pending:
-        ok, message = set_prospect_stage(pending["id"], pending["stage"])
+        ok, message = set_prospect_stage(pending["id"], pending["stage"], created_by=current_user_id())
         st.session_state["flash"] = message if ok else f"Error: {message}"
 
 
@@ -655,7 +667,7 @@ def follow_up_card(task, show_prospect=True):
 
         if task["status"] == TASK_OPEN:
             if col_button.button("Done", key=f"done_{task['id']}", width="stretch"):
-                complete_task(task["id"])
+                complete_follow_up(task["id"], current_user_id(), task.get("contact_id"))
                 st.session_state["flash"] = f"Follow-up completed: {task['title']}"
                 st.rerun()
 

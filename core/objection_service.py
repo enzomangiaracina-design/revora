@@ -59,8 +59,10 @@ def categories(objections=None):
 
 
 def record_objection(contact_id, category, verbatim=None, *, interaction_id=None, occurred_at=None,
-                     source="manual"):
+                     source="manual", created_by=None):
     """Valide puis enregistre une objection. Retourne (succès, message).
+
+    created_by : users.id de l'auteur (None = inconnu).
 
     Concept : l'étoile (*) rend interaction_id et occurred_at "nommés
     obligatoirement" : record_objection(1, "No budget", "…", occurred_at=…).
@@ -91,6 +93,7 @@ def record_objection(contact_id, category, verbatim=None, *, interaction_id=None
         interaction_id=interaction_id,
         occurred_at=when,
         source=source,
+        created_by=created_by,
     )
 
     return True, f"Objection saved: {category}."

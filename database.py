@@ -320,6 +320,37 @@ def initialize_database():
     # P2.4 : definition de chaque etape (critere d'entree), redigee par l'equipe
     _add_column_if_missing(cursor, "pipeline_stages", "definition", "TEXT")
 
+    # MIGRATIONS (phase 13, fondations memoire) : AUTEUR de chaque action.
+    # created_by = users.id de la personne active (NULL = inconnu : donnees anciennes,
+    # synchronisations, equipe vide). Aucune donnee existante n'est modifiee.
+    for table in ("interactions", "tasks", "objections", "stage_changes"):
+        _add_column_if_missing(cursor, table, "created_by", "INTEGER")
+
+    # Date de realisation d'une relance (le vrai rythme de relance)
+    _add_column_if_missing(cursor, "tasks", "completed_at", "TEXT")
+
+    # JOURNAL D'EVENEMENTS (phase 13) : qui a fait quoi, quand, sur quel objet.
+    # Notamment les suggestions IA acceptees ou refusees. Ajout uniquement :
+    # aucune fonction ne modifie ni ne supprime une ligne de ce journal.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS activity_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            action TEXT NOT NULL,
+            object_type TEXT,
+            object_id INTEGER,
+            contact_id INTEGER,
+            details TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (contact_id) REFERENCES contacts(id)
+        )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_activity_events_user ON activity_events(user_id, created_at)"
+    )
+
     connection.commit()
     connection.close()
 
@@ -389,13 +420,14 @@ def _first_stage(connection):
     return row[0] if row else DEFAULT_STAGES[0]
 
 
-def _record_stage_change(connection, contact_id, from_stage, to_stage, source):
+def _record_stage_change(connection, contact_id, from_stage, to_stage, source, created_by=None):
     """Ajoute une ligne a l'historique des etapes si l'etape change vraiment."""
 
     if from_stage != to_stage:
         connection.execute(
-            "INSERT INTO stage_changes (contact_id, from_stage, to_stage, source) VALUES (?, ?, ?, ?)",
-            (contact_id, from_stage, to_stage, source)
+            "INSERT INTO stage_changes (contact_id, from_stage, to_stage, source, created_by) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (contact_id, from_stage, to_stage, source, created_by)
         )
 
 
@@ -664,9 +696,12 @@ def update_prospect(
     status,
     source=None,
     owner=None,
-    linkedin_url=_UNCHANGED
+    linkedin_url=_UNCHANGED,
+    created_by=None
 ):
     """Met a jour un prospect. Retourne (succes, message).
+
+    created_by : users.id de l'auteur (enregistre si l'etape change).
 
     linkedin_url : si l'argument n'est pas fourni, l'URL existante est
     conservee (les appels plus anciens ne l'effacent pas).
@@ -732,7 +767,8 @@ def update_prospect(
             return False, "Prospect not found."
 
         _record_stage_change(
-            connection, contact_id, previous["status"], _clean(status) or _first_stage(connection), "edit"
+            connection, contact_id, previous["status"], _clean(status) or _first_stage(connection), "edit",
+            created_by
         )
 
         connection.commit()
@@ -1072,7 +1108,7 @@ def set_created_at(table, record_id, created_at):
         connection.close()
 
 
-def set_prospect_stage(contact_id, stage_name):
+def set_prospect_stage(contact_id, stage_name, created_by=None):
     """Deplace un prospect dans une etape du pipeline. Retourne (succes, message)."""
 
     connection = get_connection()
@@ -1094,7 +1130,7 @@ def set_prospect_stage(contact_id, stage_name):
             "UPDATE contacts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (stage_name, contact_id)
         )
-        _record_stage_change(connection, contact_id, current["status"], stage_name, "pipeline")
+        _record_stage_change(connection, contact_id, current["status"], stage_name, "pipeline", created_by)
 
         connection.commit()
 
@@ -1318,7 +1354,7 @@ def save_score(contact_id, fit, engagement, intent, global_score, explanation):
 # ==========================================
 
 def add_objection(contact_id, category, verbatim=None, *, interaction_id=None,
-                  occurred_at=None, source="manual"):
+                  occurred_at=None, source="manual", created_by=None):
     """Enregistre une objection exprimee par un prospect.
 
     L'etape actuelle du prospect est memorisee avec l'objection.
@@ -1339,13 +1375,13 @@ def add_objection(contact_id, category, verbatim=None, *, interaction_id=None,
         cursor = connection.execute(
             """
             INSERT INTO objections (
-                contact_id, interaction_id, category, verbatim, stage, source, occurred_at
+                contact_id, interaction_id, category, verbatim, stage, source, occurred_at, created_by
             )
-            VALUES (?, ?, ?, ?, ?, ?, COALESCE(datetime(?, 'utc'), CURRENT_TIMESTAMP))
+            VALUES (?, ?, ?, ?, ?, ?, COALESCE(datetime(?, 'utc'), CURRENT_TIMESTAMP), ?)
             """,
             (
                 contact_id, interaction_id, category.strip(), _clean(verbatim),
-                stage["status"], source, occurred_at
+                stage["status"], source, occurred_at, created_by
             )
         )
 
@@ -1656,9 +1692,12 @@ def add_interaction(
     content,
     outcome,
     occurred_at=None,
-    metadata=None
+    metadata=None,
+    created_by=None
 ):
     """Enregistre un appel, un email, un message LinkedIn ou une note.
+
+    created_by  : users.id de l'auteur (None = inconnu).
 
     occurred_at : date et heure LOCALES ("2026-11-14 15:30:00"), optionnelles.
                   Absentes = maintenant.
@@ -1686,11 +1725,12 @@ def add_interaction(
                 outcome,
                 occurred_at,
                 metadata,
-                provider
+                provider,
+                created_by
             )
             VALUES (?, ?, ?, ?, ?, ?, ?,
                     COALESCE(datetime(?, 'utc'), CURRENT_TIMESTAMP),
-                    ?, ?)
+                    ?, ?, ?)
             """,
             (
                 contact_id,
@@ -1702,7 +1742,8 @@ def add_interaction(
                 outcome,
                 occurred_at,
                 json.dumps(metadata) if metadata else None,
-                "manual"
+                "manual",
+                created_by
             )
         )
 
@@ -1945,8 +1986,8 @@ def get_activity_summary():
 # 8. CREATION DES RELANCES
 # ==========================================
 
-def create_task(contact_id, title, description, due_at):
-    """Cree une prochaine action commerciale."""
+def create_task(contact_id, title, description, due_at, created_by=None):
+    """Cree une prochaine action commerciale (created_by : users.id de l'auteur)."""
 
     connection = get_connection()
 
@@ -1957,15 +1998,17 @@ def create_task(contact_id, title, description, due_at):
                 contact_id,
                 title,
                 description,
-                due_at
+                due_at,
+                created_by
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 contact_id,
                 title,
                 description,
-                due_at
+                due_at,
+                created_by
             )
         )
 
@@ -2241,7 +2284,10 @@ def get_active_snoozes(today):
 
 
 def complete_task(task_id):
-    """Marque une relance comme terminee."""
+    """Marque une relance comme terminee et date sa realisation (completed_at, en UTC).
+
+    Une relance deja terminee garde sa premiere date de realisation.
+    """
 
     connection = get_connection()
 
@@ -2249,7 +2295,8 @@ def complete_task(task_id):
         connection.execute(
             """
             UPDATE tasks
-            SET status = 'Terminee'
+            SET status = 'Terminee',
+                completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP)
             WHERE id = ?
             """,
             (task_id,)
@@ -2259,6 +2306,75 @@ def complete_task(task_id):
 
     finally:
         connection.close()
+
+
+# ==========================================
+# 10 bis. JOURNAL D'EVENEMENTS (phase 13)
+# ==========================================
+
+def add_activity_event(action, user_id=None, object_type=None, object_id=None,
+                       contact_id=None, details=None):
+    """Ajoute une ligne au journal (jamais modifiee ensuite). Retourne son identifiant.
+
+    details : dictionnaire optionnel, stocke au format JSON.
+    """
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute(
+            """
+            INSERT INTO activity_events (user_id, action, object_type, object_id, contact_id, details)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, action, object_type, object_id, contact_id,
+             json.dumps(details, ensure_ascii=False) if details else None)
+        )
+        connection.commit()
+
+        return cursor.lastrowid
+
+    finally:
+        connection.close()
+
+
+def get_activity_events(user_id=None, contact_id=None, action=None, limit=100):
+    """Evenements du journal, du plus recent au plus ancien (filtres optionnels).
+
+    Chaque evenement a "details" (dictionnaire) et "created_at_local" (heure locale).
+    """
+
+    filters, params = [], []
+
+    for column, value in (("user_id", user_id), ("contact_id", contact_id), ("action", action)):
+        if value is not None:
+            filters.append(f"{column} = ?")
+            params.append(value)
+
+    where = f"WHERE {' AND '.join(filters)}" if filters else ""
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        f"""
+        SELECT *, datetime(created_at, 'localtime') AS created_at_local
+        FROM activity_events
+        {where}
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+        """,
+        (*params, int(limit))
+    ).fetchall()
+
+    connection.close()
+
+    events = []
+    for row in rows:
+        event = dict(row)
+        event["details"] = json.loads(event["details"]) if event["details"] else {}
+        events.append(event)
+
+    return events
 
 
 # ==========================================

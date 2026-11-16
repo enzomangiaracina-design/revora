@@ -36,6 +36,7 @@ from core.activity_service import (
     PERIODS,
     TASK_OPEN,
     log_interaction,
+    complete_follow_up,
     edit_interaction,
     remove_interaction,
     group_tasks,
@@ -108,6 +109,9 @@ from database import (
     get_objection_responses,
     set_objection_response
 )
+# Journal d'événements (phase 13) : auteur et décisions, base de la future mémoire
+from core.event_service import record as record_event
+
 from core.objection_service import (
     STATUSES as OBJECTION_STATUSES,
     SOURCE_LABELS as OBJECTION_SOURCE_LABELS,

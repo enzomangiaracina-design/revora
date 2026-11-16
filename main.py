@@ -104,7 +104,7 @@ if ctx.auth:
 else:
     ctx.user = signed_in_user(ctx.users)
 
-st.sidebar.caption("VERSION 0.37.0")
+st.sidebar.caption("VERSION 0.38.0")
 
 # Base de démonstration ou autre base choisie avec REVORA_DATABASE : toujours visible
 if not database.is_default_database():

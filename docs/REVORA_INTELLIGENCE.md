@@ -134,7 +134,7 @@ Le Copilot doit préciser que **réponse suivie d'un rendez-vous ne veut pas dir
 | Étape | Contenu | Prérequis | Base |
 |---|---|---|---|
 | **I0 — Regroupement** | L'entrée « AI Copilot » devient **REVORA Intelligence** avec les 3 onglets ; Copilot = chat actuel | Aucun | SQLite |
-| **Fondations mémoire** | `created_by`, journal d'événements, `tasks.completed_at`, Add / Dismiss enregistrés | Aucun (additif) | SQLite |
+| **Fondations mémoire** ✅ v0.38.0 | `created_by`, journal d'événements, `tasks.completed_at`, Add / Dismiss enregistrés | Aucun (additif) | SQLite |
 | **M1 — Interaction Memory** | Recherche plein texte dans les échanges ; souvenirs prospect (besoins, engagements, interlocuteurs) extraits avec citation et validation | Fondations | SQLite (FTS5) |
 | **M2 — User Memory** | Détecteurs d'habitudes ; hypothèse → validation ; onglet Personalization | **Vraie connexion** (phase 12.1) | SQLite |
 | **M3 — Knowledge Memory** | Liens objection → réponse → issue ; enseignements par secteur sourcés | M1 | SQLite, puis PostgreSQL |

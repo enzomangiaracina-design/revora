@@ -178,8 +178,11 @@ def create_prospect(data):
     )
 
 
-def update_prospect(contact_id, data):
-    """Valide puis met à jour un prospect. Retourne (succès, message)."""
+def update_prospect(contact_id, data, created_by=None):
+    """Valide puis met à jour un prospect. Retourne (succès, message).
+
+    created_by : users.id de l'auteur (noté si l'étape change).
+    """
 
     stages = database.get_stage_names()
     data = _apply_default_stage(data, stages)
@@ -212,6 +215,7 @@ def update_prospect(contact_id, data):
             {"linkedin_url": normalize_linkedin_url(data.get("linkedin_url"))}
             if "linkedin_url" in data else {}
         ),
+        created_by=created_by,
     )
 
 

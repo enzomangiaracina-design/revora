@@ -139,7 +139,8 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 Conception : `docs/REVORA_INTELLIGENCE.md`. Un seul espace (Copilot · Memory & Knowledge ·
 Personalization), un seul assistant. Ne démarre qu'après les fondations (phase 12.1, identité, ergonomie).
 - ⬜ I0 Regroupement : « AI Copilot » devient « REVORA Intelligence » (3 onglets)
-- ⬜ Fondations mémoire : auteur des actions (`created_by`), journal d'événements, `tasks.completed_at`
+- ✅ Fondations mémoire : auteur des actions (`created_by`), journal d'événements (`activity_events`),
+  `tasks.completed_at`, Add / Dismiss des suggestions IA enregistrés (v0.38.0)
 - ⬜ M1 Interaction Memory : recherche plein texte, souvenirs prospect sourcés et validés
 - ⬜ M2 User Memory : observation → hypothèse → préférence confirmée (nécessite la vraie connexion)
 - ⬜ M3 Knowledge Memory : objection → réponse utilisée → issue, par secteur
