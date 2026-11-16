@@ -1,5 +1,26 @@
 # CHANGELOG — REVORA
 
+## [0.37.0] — 2026-11-16 — Phase 12.2 : pilote Render préparé (rien n'est déployé)
+
+### Ajouté
+- **`render.yaml`** (Blueprint Render) : service web Python, région Francfort, disque permanent de 1 Go
+  (`/opt/render/project/src/storage`), contrôle de santé `/_stcore/health`, déploiement **manuel**
+  uniquement ; les valeurs secrètes sont demandées par Render (`sync: false`), jamais dans le dépôt.
+- **`deploy/render_start.py`** : crée la base de démo sur le disque si elle manque (jamais d'écrasement),
+  garantit `REVORA_ADMIN_EMAIL` comme manager actif, lance Streamlit sur `0.0.0.0:$PORT` avec
+  `/etc/secrets/secrets.toml`.
+- **Connexion obligatoire en ligne** (`REVORA_REQUIRE_SIGN_IN=1`) : sans configuration complète, l'écran
+  « Sign-in is not configured » bloque tout (ni navigation, ni « Signed in as »).
+- `user_service.ensure_admin`, `auth_service.sign_in_required`, `seed_demo.py --path FICHIER --if-missing`.
+- **`docs/DEPLOY_RENDER.md`** : guide pas à pas (compte, Blueprint, adresse de retour Google, Secret File,
+  mises à jour, sauvegardes, arrêt) et points à vérifier au premier déploiement.
+
+### Tests
+- 399 tests (7 nouveaux dans `tests/test_deploy.py`). Démarrage simulé « comme sur Render » sur un disque
+  temporaire : démo créée (20 prospects), manager ajouté, écran de blocage affiché, santé 200.
+- **Non vérifié** (nécessite le compte Render) : construction avec Python 3.15.2, mémoire en 512 Mo,
+  acceptation exacte de `render.yaml`.
+
 ## [0.36.0] — 2026-11-16 — Phase 12.3 : sauvegardes automatiques et journal des erreurs
 
 ### Ajouté

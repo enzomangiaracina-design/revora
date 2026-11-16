@@ -36,6 +36,7 @@
 - `DATABASE_PATH` est relatif à `database.py` (pas au dossier courant). `REVORA_DATABASE` permet de lancer l'app sur une autre base (ex. `demo.db`, générée par `seed_demo.py`) ; un bandeau l'indique. Le générateur de démo refuse d'écrire dans `revora.db`.
 - Équipe (phase 11) : table `users` ; `contacts.owner` reste un NOM (pas d'identifiant). L'utilisateur actif
   (« Signed in as », `ctx.user`) n'est PAS une authentification : pas de mot de passe.
+- Déploiement (phase 12.2) : `render.yaml` + `deploy/render_start.py` ; en ligne `REVORA_REQUIRE_SIGN_IN=1` (jamais ouvert sans connexion). Ne jamais déployer, créer de compte ni lancer « Manual Deploy » à la place de l'utilisateur.
 - Vraie connexion (phase 12.1) : `st.login` (OIDC), active seulement si `.streamlit/secrets.toml` contient
   `[auth]` complet (`ctx.auth`). Accès = email d'un membre actif de l'équipe. Jamais de mot de passe
   stocké par REVORA ; `secrets.toml` reste hors de Git.

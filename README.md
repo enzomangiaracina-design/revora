@@ -71,6 +71,11 @@ stocke aucun mot de passe. Elle ne s'active que si `.streamlit/secrets.toml` con
 
 Pour revenir au prototype local : supprimez ou renommez la section `[auth]`.
 
+### Mettre en ligne le pilote (Render)
+
+Voir `docs/DEPLOY_RENDER.md` : Blueprint `render.yaml` prêt, données de démo uniquement, connexion
+obligatoire en ligne. Rien n'est déployé tant que vous ne le lancez pas depuis votre compte Render.
+
 ## Base de démonstration (fictive)
 
 Pour tester ou faire une démo sans toucher à vos données, créez une base séparée `demo.db`

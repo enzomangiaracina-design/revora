@@ -39,6 +39,19 @@ def missing_settings(secrets):
     return [key for key in REQUIRED_AUTH_KEYS if not str(section.get(key) or "").strip()]
 
 
+REQUIRE_ENV = "REVORA_REQUIRE_SIGN_IN"
+
+
+def sign_in_required(environ):
+    """True si la connexion est OBLIGATOIRE (version en ligne : REVORA_REQUIRE_SIGN_IN=1).
+
+    Dans ce cas, REVORA refuse de s'ouvrir tant que la vraie connexion n'est pas
+    configurée : jamais de menu « Signed in as » sans mot de passe sur Internet.
+    """
+
+    return str(environ.get(REQUIRE_ENV, "")).strip().lower() in ("1", "true", "yes")
+
+
 def is_configured(secrets):
     """True si la vraie connexion doit être exigée (section [auth] présente et complète)."""
 

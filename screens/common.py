@@ -205,6 +205,7 @@ from core.auth_service import (
     is_configured as auth_is_configured,
     missing_settings as auth_missing_settings,
     REQUIRED_AUTH_KEYS as AUTH_REQUIRED_KEYS,
+    sign_in_required,
     resolve_user,
     can_manage_team,
 )

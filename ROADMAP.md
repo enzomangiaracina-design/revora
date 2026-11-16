@@ -130,7 +130,8 @@ Vérification des API réellement disponibles, appels, transcriptions, rapproche
 - ✅ Voie choisie : **A**, pilote SQLite sur disque permanent ; PostgreSQL plus tard (mémoire M3/M4)
 - ✅ 12.1 Vraie connexion (st.login, OIDC Google / Microsoft), inactive sans configuration (v0.35.0)
 - ⬜ 12.1 bis Premier test réel avec une application OAuth de test (à créer par l'utilisateur)
-- ⬜ 12.2 Hébergement du pilote (choix de l'hébergeur, disque permanent, HTTPS), données de démo uniquement
+- ✅ 12.2 Hébergeur choisi : **Render** (Francfort, ≈ 7,25 $/mois) ; Blueprint et démarrage préparés (v0.37.0)
+- ⬜ 12.2 bis Premier déploiement réel (compte Render créé par l'utilisateur, docs/DEPLOY_RENDER.md)
 - ✅ 12.3 Sauvegardes quotidiennes, restauration sûre, journal des erreurs (v0.36.0)
 - ⬜ Organisations (isolation des données entre entreprises)
 

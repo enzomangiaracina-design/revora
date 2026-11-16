@@ -15,8 +15,8 @@ import database
 from database import get_all_prospects, get_stage_names, get_users, initialize_database
 from screens import AppContext
 from screens.shared import (
-    auth_enabled, close_prospect, ensure_daily_backup, error_state, require_login, sidebar_identity,
-    signed_in_user,
+    auth_enabled, block_without_sign_in, close_prospect, ensure_daily_backup, error_state, require_login,
+    sidebar_identity, signed_in_user,
 )
 from screens import overview, prospects, prospect_details, pipeline, activity, objections, copilot, performance, settings
 from ui import theme
@@ -60,6 +60,7 @@ theme.apply_theme()
 # Active seulement si .streamlit/secrets.toml contient une section [auth] complète.
 # Sinon : prototype local, menu « Signed in as » sans mot de passe (comme avant).
 ctx.auth = auth_enabled()
+block_without_sign_in()      # en ligne (REVORA_REQUIRE_SIGN_IN=1) : jamais ouvert sans connexion
 
 if ctx.auth:
     ctx.user = require_login(ctx.users)   # arrête la page tant que personne n'est connecté
@@ -103,7 +104,7 @@ if ctx.auth:
 else:
     ctx.user = signed_in_user(ctx.users)
 
-st.sidebar.caption("VERSION 0.36.0")
+st.sidebar.caption("VERSION 0.37.0")
 
 # Base de démonstration ou autre base choisie avec REVORA_DATABASE : toujours visible
 if not database.is_default_database():

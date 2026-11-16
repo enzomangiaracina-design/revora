@@ -61,6 +61,23 @@ def auth_enabled():
     return auth_is_configured(st.secrets)
 
 
+def block_without_sign_in():
+    """Version en ligne sans connexion configurée : on n'ouvre RIEN (pas de « Signed in as »)."""
+
+    import os
+
+    if not sign_in_required(os.environ) or auth_enabled():
+        return
+
+    st.title("Sign-in is not configured")
+    st.error(
+        "This REVORA server requires sign-in, but its sign-in settings are missing or incomplete. "
+        "The administrator must add the secrets.toml secret file with a complete [auth] section "
+        "(see docs/DEPLOY_RENDER.md).", icon=":material/lock:",
+    )
+    st.stop()
+
+
 def _identity_claims():
     """Identité renvoyée par le fournisseur (dictionnaire), ou None si personne n'est connecté."""
 

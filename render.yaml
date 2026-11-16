@@ -1,0 +1,37 @@
+# Blueprint Render — pilote REVORA (phase 12.2, voie A)
+# Données de DÉMONSTRATION uniquement. Guide pas à pas : docs/DEPLOY_RENDER.md
+#
+# - Région Francfort (Europe), une seule instance avec un disque permanent de 1 Go
+#   (SQLite, sauvegardes quotidiennes et journal des erreurs y sont écrits).
+# - Pas de déploiement automatique : chaque mise en ligne se lance à la main.
+# - Les valeurs secrètes ne sont JAMAIS dans ce fichier : Render les demande à la création
+#   (sync: false). Le fichier secrets.toml (connexion Google) s'ajoute en « Secret File ».
+
+services:
+  - type: web
+    name: revora-pilot
+    runtime: python
+    region: frankfurt
+    # plan non précisé : Render utilise alors 0.5c-512mb (512 Mo, offre Starter payante,
+    # exigée pour un disque). À augmenter si la mémoire ne suffit pas.
+    buildCommand: pip install -r requirements.txt
+    startCommand: python deploy/render_start.py
+    healthCheckPath: /_stcore/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.15.2"              # version utilisée pour tous les tests de REVORA
+      - key: REVORA_DATABASE
+        value: /opt/render/project/src/storage/demo.db
+      - key: REVORA_REQUIRE_SIGN_IN
+        value: "1"                   # jamais de « Signed in as » sans mot de passe en ligne
+      - key: REVORA_ADMIN_EMAIL
+        sync: false                  # votre email Google : premier manager
+      - key: REVORA_ADMIN_NAME
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false                  # facultatif ; offre gratuite = données de démo uniquement
+    disk:
+      name: revora-data
+      mountPath: /opt/render/project/src/storage
+      sizeGB: 1

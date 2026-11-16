@@ -175,3 +175,33 @@ def for_prospects(items, prospects, key="contact_id"):
     ids = {p["id"] for p in prospects}
 
     return [item for item in items if item.get(key) in ids]
+
+
+# ==========================================
+# PREMIER MANAGER EN LIGNE (phase 12.2)
+# ==========================================
+
+def ensure_admin(email, name=None):
+    """Garantit qu'un manager actif porte cet email (premier accès à la version en ligne).
+
+    - personne avec cet email : on crée un manager ;
+    - il existe mais n'est pas manager ou est inactif : on le rétablit ;
+    - déjà manager actif : rien ne change.
+    Retourne (succès, message). Ne modifie aucun autre utilisateur.
+    """
+
+    email = _clean_email(email)
+    if not email:
+        return False, "REVORA_ADMIN_EMAIL is empty or invalid: no administrator created."
+
+    existing = next((u for u in database.get_users() if (u.get("email") or "").lower() == email), None)
+
+    if existing is None:
+        return create_user(name or email.split("@")[0], "Manager", email)
+
+    if existing["role"] != "Manager":
+        database.update_user(existing["id"], role="Manager")
+    if not existing["active"]:
+        database.update_user(existing["id"], active=True)
+
+    return True, f"{existing['name']} is an active manager."
